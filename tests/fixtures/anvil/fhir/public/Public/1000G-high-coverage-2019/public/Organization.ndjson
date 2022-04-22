@@ -1,0 +1,4 @@
+{"id":"anvil","identifier":[{"system":"https://anvil.terra.bio/program","value":"anvil"}],"resourceType":"Organization"}
+{"id":"Public","identifier":[{"system":"https://anvil.terra.bio/consortium","value":"Public"}],"partOf":{"reference":"Organization/anvil"},"resourceType":"Organization"}
+{"id":"public","identifier":[{"system":"https://anvil.terra.bio/#FHIR/data-store","value":"public"}],"partOf":{"reference":"Organization/Public"},"resourceType":"Organization"}
+{"id":"b44a3c8f-b197-52e2-9a3a-32d3d64c57c2","identifier":[{"system":"https://anvil.terra.bio/#workspaces/anvil-datastorage/","value":"1000G-high-coverage-2019"}],"partOf":{"reference":"Organization/public"},"resourceType":"Organization"}

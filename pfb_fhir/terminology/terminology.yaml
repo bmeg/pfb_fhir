@@ -1,0 +1,27 @@
+
+
+base: 'https://build.fhir.org/definitions.json.zip'
+
+valuesets:
+  # specimen
+  - 'fullUrl': 'http://terminology.hl7.org/ValueSet/v2-0487'
+    'valueset': 'https://www.hl7.org/fhir/v2/0487/v2-0487.vs.json'
+    'codesystem': 'https://terminology.hl7.org/3.1.0/CodeSystem-v2-0487.json'
+  # family
+  - 'fullUrl': 'http://terminology.hl7.org/ValueSet/v3-FamilyMember'
+    'valueset': 'https://terminology.hl7.org/3.0.0/ValueSet-v3-FamilyMember.json'
+    'codesystem': 'https://terminology.hl7.org/3.0.0/CodeSystem-v3-RoleCode.json'
+  # organization-type
+  - 'fullUrl': 'http://terminology.hl7.org/CodeSystem/organization-type'
+    'valueset': 'http://hl7.org/fhir/R4/valueset-organization-type.json'
+    'codesystem': 'https://terminology.hl7.org/3.1.0/CodeSystem-organization-type.json'
+  # patient-contactrelationship
+  - 'fullUrl': 'http://hl7.org/fhir/ValueSet/patient-contactrelationship'
+    'valueset': 'http://hl7.org/fhir/R4/valueset-patient-contactrelationship.json'
+    'codesystem': 'https://terminology.hl7.org/3.1.0/CodeSystem-v2-0131.json'
+  # patient-MaritalStatus
+  - 'fullUrl': 'http://hl7.org/fhir/R4/valueset-marital-status'
+    'valueset': 'http://hl7.org/fhir/R4/valueset-marital-status.json'
+    'codesystem': 'https://terminology.hl7.org/3.1.0/CodeSystem-v3-MaritalStatus.json'
+
+
