@@ -1,0 +1,120 @@
+{
+  "id": "c5b3fabc-35f6-5395-abbe-a01de4e2d64f",
+  "code": {
+    "coding": [
+      {
+        "code": "Summary",
+        "display": "Variable Summary",
+        "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+      }
+    ]
+  },
+  "component": [
+    {
+      "code": {
+        "coding": [
+          {
+            "code": "SampleCount",
+            "display": "Number of Samples",
+            "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+          }
+        ]
+      },
+      "valueInteger": 3202
+    },
+    {
+      "code": {
+        "coding": [
+          {
+            "code": "Participant",
+            "display": "Number of Participants",
+            "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+          }
+        ]
+      },
+      "valueInteger": 3202
+    },
+    {
+      "code": {
+        "coding": [
+          {
+            "code": "StorageSize",
+            "display": "Size on Disk",
+            "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+          }
+        ]
+      },
+      "valueQuantity": {
+        "code": "L",
+        "system": "http://unitsofmeasure.org",
+        "value": 90736987729057
+      }
+    },
+    {
+      "code": {
+        "coding": [
+          {
+            "code": "TerraWorkspace",
+            "display": "Terra Workspace Name",
+            "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+          }
+        ]
+      },
+      "valueString": "1000G-high-coverage-2019"
+    },
+    {
+      "code": {
+        "coding": [
+          {
+            "code": "PrimaryDisease",
+            "display": "Primary Disease",
+            "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+          }
+        ]
+      }
+    },
+    {
+      "code": {
+        "coding": [
+          {
+            "code": "StudyDesign",
+            "display": "Study Design",
+            "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+          }
+        ]
+      },
+      "valueString": "Parent-Offspring Trios"
+    },
+    {
+      "code": {
+        "coding": [
+          {
+            "code": "DataType",
+            "display": "Data Type",
+            "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+          }
+        ]
+      },
+      "valueString": "Whole Genome"
+    },
+    {
+      "code": {
+        "coding": [
+          {
+            "code": "ConsentCodes",
+            "display": "Consent Codes",
+            "system": "https://nih-ncpi.github.io/ncpi-fhir-ig"
+          }
+        ]
+      },
+      "valueString": "NRES"
+    }
+  ],
+  "focus": [
+    {
+      "reference": "ResearchStudy/1000G-high-coverage-2019"
+    }
+  ],
+  "status": "final",
+  "resourceType": "Observation"
+}
