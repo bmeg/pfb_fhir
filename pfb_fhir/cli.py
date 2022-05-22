@@ -98,8 +98,9 @@ def inspect(ctx, pfb_path):
 
 @cli.command("visualize")
 @click.option('--pfb_path', help='Location to read PFB.')
+@click.option('--layout', show_default=True, default='planar_layout', help='Position nodes algorithm. see https://networkx.org/documentation/stable/reference/drawing.html')
 @click.pass_context
-def visualize(ctx, pfb_path):
+def visualize(ctx, pfb_path, layout):
     """Create a simple visualization."""
     results = inspect_pfb(pfb_path)
     graph = nx.MultiDiGraph()
@@ -117,8 +118,13 @@ def visualize(ctx, pfb_path):
             graph.add_edge(summary.name, relationship.dst, count=relationship.count)
             edge_dict[(summary.name, relationship.dst)] = relationship.count
 
-    pos = nx.spring_layout(graph)
-    fig, ax = plt.subplots(1, 1, figsize=(20, 20))
+    if not (hasattr(nx, layout) and callable(getattr(nx, layout))):
+        logger.error(f"Unknown layout {layout}. {[attr for attr in dir(nx) if 'layout' in attr]}")
+        return
+
+    layout_func = getattr(nx, layout)
+    pos = layout_func(graph)
+    fig, ax = plt.subplots(1, 1, figsize=(15, 15))
     nx.draw(graph, pos, ax=ax, with_labels=True, labels=node_dict, node_size=6000, node_color='w', alpha=0.9,
             edgecolors="black")
     nx.draw_networkx_edge_labels(
@@ -207,6 +213,7 @@ def demo(ctx, demo_path, show, dry_run):
     ctx.obj['anvil_path'] = Path(demo_path, 'anvil')
     ctx.obj['dbgap_path'] = Path(demo_path, 'dbgap')
     ctx.obj['synthea_path'] = Path(demo_path, 'synthea')
+    ctx.obj['kf_path'] = Path(demo_path, 'kf')
     download_script = f"""
     # setup
     mkdir -p {demo_path}
@@ -364,6 +371,39 @@ def synthea(ctx):
     figure_script = f"""
     # visualize
     pfb_fhir visualize  --pfb_path {synthea_path}/output/synthea.pfb.avro
+    """
+    if show:
+        print(pfb_script)
+    if not dry_run:
+        logger.info("Creating PFB.")
+        run_cmd(pfb_script)
+        logger.info("Creating figure.")
+        run_cmd(figure_script)
+
+
+@demo.command()
+@click.pass_context
+def kf(ctx):
+    """Read synthetic clinical data created by synthea."""
+    show = ctx.obj['show']
+    dry_run = ctx.obj['dry_run']
+    kf_path = ctx.obj['kf_path']
+
+    pfb_script = f"""
+    # KF
+    mkdir -p {kf_path}/output
+    # PFB
+    pfb_fhir \
+      --config_path {kf_path}/config.yaml \
+      --output_path {kf_path}/output \
+      transform \
+      --pfb_path {kf_path}/output/kf.pfb.avro \
+      --input_path '{kf_path}/examples/*.ndjson'
+      """
+
+    figure_script = f"""
+    # visualize
+    pfb_fhir visualize  --pfb_path {kf_path}/output/kf.pfb.avro
     """
     if show:
         print(pfb_script)
