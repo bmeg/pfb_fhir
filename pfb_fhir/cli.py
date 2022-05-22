@@ -384,7 +384,7 @@ def synthea(ctx):
 @demo.command()
 @click.pass_context
 def kf(ctx):
-    """Read synthetic clinical data created by synthea."""
+    """Read synthetic clinical data created by kids first."""
     show = ctx.obj['show']
     dry_run = ctx.obj['dry_run']
     kf_path = ctx.obj['kf_path']
