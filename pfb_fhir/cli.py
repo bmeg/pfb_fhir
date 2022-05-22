@@ -219,7 +219,7 @@ def demo(ctx, demo_path, show, dry_run):
     mkdir -p {demo_path}
     cd {demo_path}
     temp_file=$(mktemp)
-    wget -qO- https://github.com/bmeg/pfb_fhir/releases/download/v0.0.0-fixtures/fixtures.zip > $temp_file
+    wget -qO- https://github.com/bmeg/pfb_fhir/releases/download/latest/fixtures.zip > $temp_file
     unzip $temp_file
     rm $temp_file
     cd .."""
