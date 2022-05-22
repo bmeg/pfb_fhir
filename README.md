@@ -40,12 +40,14 @@ Render a PFB graph from FHIR data
 * pypfb[gen3]
 * flatten_json
 * fhirclientr4
+* synthea
 
 ### Special thanks
-[Kyle Ellrott](ellrottlab.org) (OHSU) 
-NHGRI Genomic Data Science Analysis, Visualization and Informatics Lab-space [AnVIL](https://anvilproject.org/)
-NCPI FHIR Working Group, Robert Carroll (VUMC), Allison Heath (CHOP) 
-GA4GH [cohort-rep-hackathon](https://github.com/ga4gh/cohort-rep-hackathon) for synthea FHIR data
+* [Kyle Ellrott](ellrottlab.org) (OHSU) 
+* NHGRI Genomic Data Science Analysis, Visualization and Informatics Lab-space [AnVIL](https://anvilproject.org/)
+* NCPI FHIR Working Group, Robert Carroll (VUMC), Allison Heath (CHOP) 
+* Center for Translational Data Science (UChicago) [gen3](https://gen3.org/)
+* GA4GH [cohort-rep-hackathon](https://github.com/ga4gh/cohort-rep-hackathon) synthea
 
 ## Getting Started
 
