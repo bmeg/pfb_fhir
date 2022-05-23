@@ -20,11 +20,22 @@ def test_flattened_patient_model(config_path, input_paths):
     """Borrows fixtures from ncpi fhir resources."""
     model = initialize_model(config_path)
 
+    def to_tsv(properties):
+        print()
+        print("\t".join([flattened_key for flattened_key in properties]))
+        print("\t".join([str(p.value) for p in properties.values()]))
+
     for file in input_paths:
+        for context in process_files(model, file, simplify=False):
+            assert context
+            assert isinstance(context.properties, dict)
+            to_tsv(context.properties)
+            print(len(context.properties))
+
         for context in process_files(model, file, simplify=True):
             assert context
-            properties = context.properties
-            actual_keys = set([p.flattened_key for p in context.properties])
+            assert isinstance(context.properties, dict)
+            actual_keys = set([k for k in context.properties])
             expected_keys = {'resourceType', 'id', 'text.status', 'text.div', 'name.use', 'name.text', 'name.family', 'name.given.0',
              'name.given.1', 'telecom.system', 'telecom.value', 'telecom.use', 'telecom.rank', 'gender', 'address.use',
              'address.type', 'address.text', 'address.line', 'address.city', 'address.state', 'address.postalCode',
@@ -36,6 +47,8 @@ def test_flattened_patient_model(config_path, input_paths):
              'contact.relationship.v2-0131.display', 'us-core-race.ombCategory', 'us-core-race.detailed',
              'us-core-race.text', 'us-core-ethnicity.ombCategory', 'us-core-ethnicity.text'}
             assert expected_keys == actual_keys
+            to_tsv(context.properties)
+            print(len(context.properties))
 
 
 def test_flattened_patient_emitter(config_path, input_paths, output_path, pfb_path):

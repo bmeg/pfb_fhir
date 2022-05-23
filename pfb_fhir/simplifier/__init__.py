@@ -25,10 +25,10 @@ class ContextSimplifier(object):
         simplified_properties = ContextSimplifier._single_item_lists(simplified_properties)
         simplified_properties = ContextSimplifier._codings(simplified_properties)
         # logger.info([p.flattened_key for p in context.properties.values()])
-        context.properties = []
-        for k, v in simplified_properties.items():
-            context.properties.extend(v)
-        # logger.info([p.flattened_key for p in context.properties])
+        context.properties = {}
+        for k, properties in simplified_properties.items():
+            for p in properties:
+                context.properties[p.flattened_key] = p
         return context
 
     @staticmethod
