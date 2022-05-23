@@ -79,5 +79,4 @@ def test_patient_emitter(config_path, patient_input_path, output_path, pfb_path)
         'contact_0_relationship_0_coding_0_code'
     }
 
-
-    # cleanup_emitter(output_path, pfb_path)
+    cleanup_emitter(output_path, pfb_path)
