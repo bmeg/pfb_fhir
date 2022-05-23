@@ -57,7 +57,6 @@ Installation:
 # clone 
 git clone https://github.com/bmeg/pfb_fhir
 cd pfb_fhir
-git checkout -b 0.0.0
 
 ```
 
@@ -222,15 +221,17 @@ Brian Walsh - [@bpwalsh](https://twitter.com/bpwalsh) - walsbr AT ohsu DOT edu
   * ✅  Parse FHIR resources, retrieve and cache FHIR profile (schema) elements,
   * ✅   Recursively match with FHIR profiles (schemas)
   * ✅   Flatten for export
-  *  ✅ write to PFB
-  *  ✅ test cases for protected/ resources - ResearchSubject, Patient, Specimen, Task, DocumentReference
-  *  ✅ networkx based visualization
-  *  ✅ pfb cli
-  *  ✅ demo with public data
-  *  ✅ update README with Terra import examples
-  *  ✅ update README with gen3 import examples
-  *  ✅ update to new release of pypfb `0.5.18`
-  * [ ] 🚧  check with kids first to see if we can include a demo of their data
+  * ✅ write to PFB
+  * ✅ test cases for protected/ resources - ResearchSubject, Patient, Specimen, Task, DocumentReference
+  * ✅ networkx based visualization
+  * ✅ pfb cli
+  * ✅ demo with public data
+  * ✅ update README with Terra import examples
+  * ✅ update README with gen3 import examples
+  * ✅ update to new release of pypfb `0.5.18`
+  * ✅ include kids first
+  * ✅ simplify
+  * [ ] 🚧 add genomic reporting [examples](http://hl7.org/fhir/uv/genomics-reporting/artifacts.html#example-example-instances)
   * [ ] 🚧 pypi
   
 
