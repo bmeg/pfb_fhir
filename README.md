@@ -78,7 +78,7 @@ pip install -e .
 ```
 ## Usage
 
-See help for a list of commands:
+See help for a list of commands, examine configuration examples in fixtures:
 
 ```commandline
 $ pfb_fhir --help
@@ -118,13 +118,13 @@ Commands:
 
 Several demonstration datasets are available:
 
-*  anvil    Read 1000G data from AnVIL.
-*  dbgap    Read open access data from dbGAP's FHIR service.
-*  kf       Read synthetic clinical data created by kids first.
-*  ncpi     Read examples from ncpi ImplementationGuide.
-*  synthea  Read synthetic clinical data created by synthea.
+*  [anvil](docs/anvil.pfb.avro.png)   Read 1000G data from AnVIL.
+*  [dbgap](docs/dbgap.pfb.avro.png)    Read open access data from dbGAP's FHIR service.
+*  [kf](docs/kf.pfb.avro.png)       Read synthetic clinical data created by kids first.
+*  [ncpi](docs/ncpi.pfb.avro.png)     Read examples from ncpi ImplementationGuide.
+*  [synthea](docs/synthea.pfb.avro.png)  Read synthetic clinical data created by synthea.
+*  [genomic-reporting](docs/genomics-reporting.pfb.avro.png)  Read oncology example from ImplementationGuide.
 
-See [figure](docs/pfb_fhir-demos.png)
 
 For example:
 
@@ -149,6 +149,9 @@ cat DEMO/dbgap/output/dbgap.pfb.avro | pfb show stats
 
 ### Terra
 ```commandline
+# run the demo
+pfb_fhir demo synthea
+
 # upload that PFB to google storage
 gsutil cp DEMO/synthea/output/synthea.pfb.avro $GOOGLE_BUCKET
 
@@ -164,7 +167,7 @@ open 'https://app.terra.bio/#import-data?format=PFB&url=https:....'
 ![image](https://user-images.githubusercontent.com/47808/168388141-fd58460d-17de-4992-bc84-9840840397c4.png)
 
 
-###Gen3
+### Gen3
 
 The easiest way to see the resulting schema in gen3 is to use the [Data Dictionary Development workflow](https://github.com/umccr/umccr-dictionary)
 Use the intermediate file located at <PFB_FHIR_OUTPUT_PATH>/<name>/output/dump-ordered.json e.g. DEMO/ncpi/output/dump-ordered.json 
@@ -217,10 +220,10 @@ Brian Walsh - [@bpwalsh](https://twitter.com/bpwalsh) - walsbr AT ohsu DOT edu
 
 ## Roadmap
 
-  * ✅  config.yaml driven map of FHIR resource to PFB node, 
-  * ✅  Parse FHIR resources, retrieve and cache FHIR profile (schema) elements,
-  * ✅   Recursively match with FHIR profiles (schemas)
-  * ✅   Flatten for export
+  * ✅ config.yaml driven map of FHIR resource to PFB node, 
+  * ✅ Parse FHIR resources, retrieve and cache FHIR profile (schema) elements,
+  * ✅ Recursively match with FHIR profiles (schemas)
+  * ✅ Flatten for export
   * ✅ write to PFB
   * ✅ test cases for protected/ resources - ResearchSubject, Patient, Specimen, Task, DocumentReference
   * ✅ networkx based visualization
@@ -231,10 +234,9 @@ Brian Walsh - [@bpwalsh](https://twitter.com/bpwalsh) - walsbr AT ohsu DOT edu
   * ✅ update to new release of pypfb `0.5.18`
   * ✅ include kids first
   * ✅ simplify
-  * [ ] 🚧 add genomic reporting [examples](http://hl7.org/fhir/uv/genomics-reporting/artifacts.html#example-example-instances)
+  * ✅ add genomic reporting [examples](http://hl7.org/fhir/uv/genomics-reporting/artifacts.html#example-example-instances)
   * [ ] 🚧 pypi
   
-
-
- 
-
+## Known Issues
+  * `simplify` - could do a better job of making resulting nodes more "data frame friendly"
+  * `config.yaml` - currently there is no way of expressing a reference found in a FHIR extension.
