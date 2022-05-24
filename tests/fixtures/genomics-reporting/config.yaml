@@ -1,0 +1,200 @@
+entities:
+
+  # admin
+  Organization:
+    category: Administrative
+    id: Organization
+    links:
+      partOf:
+        id: partOf
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Organization
+    source: null
+
+  Practitioner:
+    category: Administrative
+    id: Practitioner
+    links: [ ]
+    source: null
+
+  PractitionerRole:
+    category: Administrative
+    id: PractitionerRole
+    links:
+      organization:
+        id: organization
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Organization
+      practitioner:
+        id: practitioner
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Practitioner
+    source: null
+
+  # clinical
+
+  ResearchStudy:
+    category: Administrative
+    id: ResearchStudy
+    links:
+      partOf:
+        id: partOf
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/ResearchStudy
+      principalInvestigator:
+        id: principalInvestigator
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Practitioner
+      sponsor:
+        id: sponsor
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Organization
+    source: null
+
+  Patient:
+    category: Administrative
+    id: Patient
+    links:
+      managingOrganization:
+        id: managingOrganization
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Organization
+    source: null
+
+  ResearchSubject:
+    category: Administrative
+    id: ResearchSubject
+    links:
+      individual:
+        id: individual
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+      study:
+        id: study
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/ResearchStudy
+    source: null
+
+
+  Specimen:
+    category: Biospecimen
+    id: Specimen
+    links:
+      subject:
+        id: subject
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+    source: null
+
+  FamilyRelationship:
+    category: Administrative
+    id: FamilyRelationship
+    links:
+      subject:
+        id: subject
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+    source: https://nih-ncpi.github.io/ncpi-fhir-ig/StructureDefinition-family-relationship.json
+
+  Observation:
+    category: Clinical
+    id: Observation
+    links:
+      focus:
+        id: focus
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/ResearchStudy
+      specimen:
+        id: specimen
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Specimen
+      subject:
+        id: subject
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+    source: null
+
+  Questionnaire:
+    category: Clinical
+    id: Questionnaire
+    links:
+      researchStudy:
+        id: researchStudy
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/ResearchStudy
+    source: null
+
+  QuestionnaireResponse:
+    category: Clinical
+    id: QuestionnaireResponse
+    links:
+      questionnaire:
+        id: questionnaire
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Questionnaire
+      subject:
+        id: subject
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+    source: null
+
+  DocumentReference:
+    category: data_file
+    id: DocumentReference
+    links:
+      subject:
+        id: subject
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+    source: https://nih-ncpi.github.io/ncpi-fhir-ig/StructureDefinition-ncpi-drs-document-reference.json
+
+  Task:
+    category: Analysis
+    id: Task
+    links:
+      for:
+        id: for
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+      focus:
+        id: focus
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Specimen
+      output:
+        id: output
+        required: true
+        targetProfile: http://hl7.org/fhir/StructureDefinition/DocumentReference
+    source: https://nih-ncpi.github.io/ncpi-fhir-ig/StructureDefinition-ncpi-specimen-task.json
+
+
+  PlanDefinition:
+    category: Administrative
+    id: PlanDefinition
+    links:
+      subject:
+        id: subject
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+    source: null
+
+  DiagnosticReport:
+      category: Clinical
+      id: DiagnosticReport
+      links:
+        subject:
+          id: subject
+          required: false
+          targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+        specimen:
+          id: specimen
+          required: false
+          targetProfile: http://hl7.org/fhir/StructureDefinition/Specimen
+        performer:
+          id: performer
+          required: false
+          targetProfile: http://hl7.org/fhir/StructureDefinition/Practitioner
+        result:
+          id: result
+          required: false
+          targetProfile: http://hl7.org/fhir/StructureDefinition/Observation
+      source: null

@@ -218,6 +218,7 @@ def demo(ctx, demo_path, show, dry_run):
     ctx.obj['dbgap_path'] = Path(demo_path, 'dbgap')
     ctx.obj['synthea_path'] = Path(demo_path, 'synthea')
     ctx.obj['kf_path'] = Path(demo_path, 'kf')
+    ctx.obj['gr_path'] = Path(demo_path, 'genomics-reporting')
     download_script = f"""
     # setup
     mkdir -p {demo_path}
@@ -388,7 +389,7 @@ def synthea(ctx):
 @demo.command()
 @click.pass_context
 def kf(ctx):
-    """Read synthetic clinical data created by kids first."""
+    """Read research study hosted by kids first."""
     show = ctx.obj['show']
     dry_run = ctx.obj['dry_run']
     kf_path = ctx.obj['kf_path']
@@ -408,6 +409,39 @@ def kf(ctx):
     figure_script = f"""
     # visualize
     pfb_fhir visualize  --pfb_path {kf_path}/output/kf.pfb.avro
+    """
+    if show:
+        print(pfb_script)
+    if not dry_run:
+        logger.info("Creating PFB.")
+        run_cmd(pfb_script)
+        logger.info("Creating figure.")
+        run_cmd(figure_script)
+
+
+@demo.command()
+@click.pass_context
+def genomic_reporting(ctx):
+    """Read oncology example from ImplementationGuide."""
+    show = ctx.obj['show']
+    dry_run = ctx.obj['dry_run']
+    gr_path = ctx.obj['gr_path']
+
+    pfb_script = f"""
+    # GR
+    mkdir -p {gr_path}/output
+    # PFB
+    pfb_fhir \
+      --config_path {gr_path}/config.yaml \
+      --output_path {gr_path}/output \
+      transform \
+      --pfb_path {gr_path}/output/genomics-reporting.pfb.avro \
+      --input_path '{gr_path}/examples/Bundle-bundle-oncologyexamples-r4.normalized.json'
+      """
+
+    figure_script = f"""
+    # visualize
+    pfb_fhir visualize  --pfb_path {gr_path}/output/genomics-reporting.pfb.avro
     """
     if show:
         print(pfb_script)

@@ -19,6 +19,8 @@ class ContextSimplifier(object):
     def simplify(context: TransformerContext) -> TransformerContext:
         # group_by_root
         simplified_properties = defaultdict(list)
+        if context.properties is None:
+            print("?")
         for property_ in context.properties.values():
             simplified_properties[property_.leaf_elements[0]['id']].append(property_)
         simplified_properties = ContextSimplifier._extensions(simplified_properties)
@@ -103,8 +105,9 @@ class ContextSimplifier(object):
 
                 extension_index += 1
 
-        del simplified_properties[simplified_extensions_key]
-        simplified_properties[simplified_extensions_key] = simplified_extensions
+        if simplified_extensions_key:
+            del simplified_properties[simplified_extensions_key]
+            simplified_properties[simplified_extensions_key] = simplified_extensions
 
         return simplified_properties
 

@@ -8,3 +8,4 @@ pytest==7.1.1
 pytest-cov==3.0.0
 wheel
 pyproject-flake8
+jsonpath_ng
