@@ -164,7 +164,7 @@ open 'https://app.terra.bio/#import-data?format=PFB&url=https:....'
 ![image](https://user-images.githubusercontent.com/47808/168388141-fd58460d-17de-4992-bc84-9840840397c4.png)
 
 
-###Gen3
+### Gen3
 
 The easiest way to see the resulting schema in gen3 is to use the [Data Dictionary Development workflow](https://github.com/umccr/umccr-dictionary)
 Use the intermediate file located at <PFB_FHIR_OUTPUT_PATH>/<name>/output/dump-ordered.json e.g. DEMO/ncpi/output/dump-ordered.json 
