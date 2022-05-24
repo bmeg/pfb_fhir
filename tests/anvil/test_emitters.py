@@ -139,16 +139,3 @@ def _is_gen3_fixture(path_):
         if gen3_fixture in path_:
             return True
     return False
-
-
-# def _remove_transient_files(my_pfb, output_path, schema_work_dir):
-#     """Remove files emitters will create."""
-#     with suppress(FileNotFoundError):
-#         os.remove(my_pfb)
-#     with suppress(FileNotFoundError):
-#         os.remove(f"{output_path}/dump.json")
-#     with suppress(FileNotFoundError):
-#         for path in glob.glob(f"{schema_work_dir}/*.yaml"):
-#             if _is_gen3_fixture(path):
-#                 continue
-#             os.remove(path)

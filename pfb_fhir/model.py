@@ -329,7 +329,10 @@ class TransformerContext(Context):
     """A list of transformed properties"""
 
     entity: Optional[Entity]
-    """Entity from model associated with transformer."""
+    """Model Entity associated with transformer."""
+
+    simplify: Optional[bool] = False
+    """Flag, if set, remove FHIR scaffolding"""
 
 
 class EdgeSummary(BaseModel):

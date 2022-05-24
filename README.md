@@ -57,7 +57,6 @@ Installation:
 # clone 
 git clone https://github.com/bmeg/pfb_fhir
 cd pfb_fhir
-git checkout -b 0.0.0
 
 ```
 
@@ -165,7 +164,7 @@ open 'https://app.terra.bio/#import-data?format=PFB&url=https:....'
 ![image](https://user-images.githubusercontent.com/47808/168388141-fd58460d-17de-4992-bc84-9840840397c4.png)
 
 
-###Gen3
+### Gen3
 
 The easiest way to see the resulting schema in gen3 is to use the [Data Dictionary Development workflow](https://github.com/umccr/umccr-dictionary)
 Use the intermediate file located at <PFB_FHIR_OUTPUT_PATH>/<name>/output/dump-ordered.json e.g. DEMO/ncpi/output/dump-ordered.json 
@@ -222,15 +221,17 @@ Brian Walsh - [@bpwalsh](https://twitter.com/bpwalsh) - walsbr AT ohsu DOT edu
   * ✅  Parse FHIR resources, retrieve and cache FHIR profile (schema) elements,
   * ✅   Recursively match with FHIR profiles (schemas)
   * ✅   Flatten for export
-  *  ✅ write to PFB
-  *  ✅ test cases for protected/ resources - ResearchSubject, Patient, Specimen, Task, DocumentReference
-  *  ✅ networkx based visualization
-  *  ✅ pfb cli
-  *  ✅ demo with public data
-  *  ✅ update README with Terra import examples
-  *  ✅ update README with gen3 import examples
-  *  ✅ update to new release of pypfb `0.5.18`
-  * [ ] 🚧  check with kids first to see if we can include a demo of their data
+  * ✅ write to PFB
+  * ✅ test cases for protected/ resources - ResearchSubject, Patient, Specimen, Task, DocumentReference
+  * ✅ networkx based visualization
+  * ✅ pfb cli
+  * ✅ demo with public data
+  * ✅ update README with Terra import examples
+  * ✅ update README with gen3 import examples
+  * ✅ update to new release of pypfb `0.5.18`
+  * ✅ include kids first
+  * ✅ simplify
+  * [ ] 🚧 add genomic reporting [examples](http://hl7.org/fhir/uv/genomics-reporting/artifacts.html#example-example-instances)
   * [ ] 🚧 pypi
   
 

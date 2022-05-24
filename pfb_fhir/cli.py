@@ -21,6 +21,7 @@ from pfb_fhir.emitter import pfb
 from pfb_fhir.model import TransformerContext
 from pfb_fhir.observable import ObservableData
 from pfb_fhir.emitter import inspect_pfb
+from pfb_fhir.simplifier import ContextSimplifier
 
 LOG_FORMAT = '%(asctime)s %(name)s %(levelname)-8s %(message)s'
 logger = logging.getLogger(__name__)
@@ -58,8 +59,9 @@ def version():
 @cli.command("transform")
 @click.option('--input_path',  multiple=True, help='FHIR resources paths.')
 @click.option('--pfb_path', help='Location to write PFB.')
+@click.option('--simplify', is_flag=True, show_default=True, default=False, help="Remove FHIR scaffolding, make data frame friendly.")
 @click.pass_context
-def transform(ctx, input_path, pfb_path):
+def transform(ctx, input_path, pfb_path, simplify):
     """Transform FHIR resources from directory."""
     model = ctx.obj['model']
     if not model:
@@ -161,7 +163,7 @@ def _sniff(file_path) -> Iterator[dict]:
                 yield json.loads(line)
 
 
-def process_files(model, input_paths) -> Iterator[TransformerContext]:
+def process_files(model, input_paths, simplify=False) -> Iterator[TransformerContext]:
     """Set up context and stream files into the model."""
     # handle either file or path pattern
     if not isinstance(input_paths, (list, tuple, )):
@@ -177,11 +179,13 @@ def process_files(model, input_paths) -> Iterator[TransformerContext]:
             logger.info(file)
             for json_ in _sniff(file):
                 # copy the model into the observer context
-                context = TransformerContext(model=model)
+                context = TransformerContext(model=model, simplify=simplify)
                 model.observe(
                     ObservableData(payload=json_)) \
                     .assert_observers() \
                     .notify_observers(context=context)
+                if simplify:
+                    context = ContextSimplifier.simplify(context)
                 yield context
 
 
