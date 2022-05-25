@@ -27,7 +27,7 @@ def patient_input_path():
 
 
 @fixture
-def input_paths():
+def input_ncpi_patient_paths():
     """File paths."""
     return [
         'tests/fixtures/ncpi/examples/Practitioner-practitioner-example-1.json',

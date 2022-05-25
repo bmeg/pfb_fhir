@@ -17,12 +17,12 @@ class ContextSimplifier(object):
 
     @staticmethod
     def simplify(context: TransformerContext) -> TransformerContext:
-        # group_by_root
-        simplified_properties = defaultdict(list)
-        if context.properties is None:
-            print("?")
-        for property_ in context.properties.values():
-            simplified_properties[property_.leaf_elements[0]['id']].append(property_)
+        """
+
+        :rtype: object
+        """
+        assert context.properties
+        simplified_properties = ContextSimplifier._group_by_root(context)
         simplified_properties = ContextSimplifier._extensions(simplified_properties)
         simplified_properties = ContextSimplifier._single_item_lists(simplified_properties)
         simplified_properties = ContextSimplifier._codings(simplified_properties)
@@ -32,6 +32,14 @@ class ContextSimplifier(object):
             for p in properties:
                 context.properties[p.flattened_key] = p
         return context
+
+    @staticmethod
+    def _group_by_root(context: TransformerContext) -> Dict[str, list]:
+        """Gather flattened properties to original key."""
+        simplified_properties = defaultdict(list)
+        for property_ in context.properties.values():
+            simplified_properties[property_.leaf_elements[0]['id']].append(property_)
+        return simplified_properties
 
     @staticmethod
     def _single_item_lists(simplified_properties: Dict[str, List]) -> Dict[str, List]:

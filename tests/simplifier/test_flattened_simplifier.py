@@ -16,20 +16,22 @@ from tests import cleanup_emitter
 logger = logging.getLogger(__name__)
 
 
-def test_flattened_patient_model(config_path, input_paths):
+def _to_tsv(properties):
+    """Print tsv."""
+    print()
+    print("\t".join([flattened_key for flattened_key in properties]))
+    print("\t".join([str(p.value) for p in properties.values()]))
+
+
+def test_flattened_ncpi_patient_model(config_path, input_ncpi_patient_paths):
     """Borrows fixtures from ncpi fhir resources."""
     model = initialize_model(config_path)
 
-    def to_tsv(properties):
-        print()
-        print("\t".join([flattened_key for flattened_key in properties]))
-        print("\t".join([str(p.value) for p in properties.values()]))
-
-    for file in input_paths:
+    for file in input_ncpi_patient_paths:
         for context in process_files(model, file, simplify=False):
             assert context
             assert isinstance(context.properties, dict)
-            to_tsv(context.properties)
+            _to_tsv(context.properties)
             print(len(context.properties))
 
         for context in process_files(model, file, simplify=True):
@@ -47,16 +49,49 @@ def test_flattened_patient_model(config_path, input_paths):
              'contact.relationship.v2-0131.display', 'us-core-race.ombCategory', 'us-core-race.detailed',
              'us-core-race.text', 'us-core-ethnicity.ombCategory', 'us-core-ethnicity.text'}
             assert expected_keys == actual_keys
-            to_tsv(context.properties)
+            _to_tsv(context.properties)
             print(len(context.properties))
 
 
-def test_flattened_patient_emitter(config_path, input_paths, output_path, pfb_path):
+def test_flattened_synthea_patient_model(config_path, input_synthea_patient_paths):
+    """Borrows fixtures from synthea fhir resources."""
+    model = initialize_model(config_path)
+
+    for file in input_synthea_patient_paths:
+        for context in process_files(model, file, simplify=False):
+            assert context
+            assert isinstance(context.properties, dict)
+            _to_tsv(context.properties)
+            simplified_properties = ContextSimplifier._group_by_root(context)
+            assert len(simplified_properties['Patient.extension']) == 26
+            assert len(simplified_properties['Patient.address']) == 10
+            simplified_properties = ContextSimplifier._extensions(simplified_properties)
+            assert len(simplified_properties['Patient.extension']) == 4, "Should simplify root extensions"
+            assert len(simplified_properties['Patient.address']) < 10, f"Should simplify property extensions {[p.flattened_key for p in simplified_properties['Patient.address'] if 'extension' in p.flattened_key]}"
+            simplified_properties = ContextSimplifier._single_item_lists(simplified_properties)
+            simplified_properties = ContextSimplifier._codings(simplified_properties)
+
+            # only first record
+            break
+        #
+        # for context in process_files(model, file, simplify=True):
+        #     assert context
+        #     assert isinstance(context.properties, dict)
+        #     actual_keys = set([k for k in context.properties])
+        #     expected_keys = {'TODO'}
+        #     assert expected_keys == actual_keys
+        #     _to_tsv(context.properties)
+        #     print(len(context.properties))
+        #     # only first record
+        #     break
+
+
+def test_flattened_ncpi_patient_emitter(config_path, input_ncpi_patient_paths, output_path, pfb_path):
     """Borrows fixtures from ncpi fhir resources."""
     model = initialize_model(config_path)
 
     with pfb(output_path, pfb_path, model) as pfb_:
-        for context in process_files(model, input_paths):
+        for context in process_files(model, input_ncpi_patient_paths):
             pfb_.emit(context)
 
     assert os.path.isfile(pfb_path)

@@ -8,12 +8,12 @@ from pfb_fhir.emitter import pfb, inspect_pfb
 from tests import cleanup_emitter
 
 
-def test_model(config_path, input_paths, expected_results):
+def test_model(config_path, input_ncpi_patient_paths, expected_results):
     """Test Input Files vs expected keys."""
     model = initialize_model(config_path)
     resource_properties = defaultdict(set)
 
-    for file in input_paths:
+    for file in input_ncpi_patient_paths:
         for context in process_files(model, file):
             assert context
             for k in ['model', 'properties', 'resource', 'entity']:
@@ -28,12 +28,12 @@ def test_model(config_path, input_paths, expected_results):
         assert expected_results[key] == resource_properties[key]
 
 
-def test_emitter(config_path, input_paths, output_path, pfb_path):
+def test_emitter(config_path, input_ncpi_patient_paths, output_path, pfb_path):
     """Test Input Files vs emitted PFB ."""
     model = initialize_model(config_path)
 
     with pfb(output_path, pfb_path, model) as pfb_:
-        for context in process_files(model, input_paths):
+        for context in process_files(model, input_ncpi_patient_paths):
             pfb_.emit(context)
 
     assert os.path.isfile(pfb_path)
