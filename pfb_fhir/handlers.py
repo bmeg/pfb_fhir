@@ -30,6 +30,7 @@ def resource_handler(entity: Entity, observable: ObservableData, context: Transf
 
     # append resourceType mock element so that 'resourceType' field flows
     resource_type = observable.payload['resourceType']
+    resource_id = observable.payload['id']
     resource_element = elements[resource_type]
     resource_type_element = {
         "id": f"{resource_type}.resourceType",
@@ -56,6 +57,12 @@ def resource_handler(entity: Entity, observable: ObservableData, context: Transf
     # retrieve definition for each element.
     resource_properties: Dict[str, Property] = {}
     for flattened_key in properties:
+        if flattened_key.startswith('contained'):
+            logger.warning(
+                f"{resource_type}/{resource_id} includes 'contained' resources. Unsupported at this time. Ignoring."
+            )
+            logger.warning(properties[flattened_key])
+            continue
         # see if we've walked them up already
         if flattened_key in walked_properties:
             resource_properties[flattened_key] = copy(walked_properties[flattened_key])
