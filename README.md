@@ -47,6 +47,7 @@ Render a PFB graph from FHIR data
 * NHGRI Genomic Data Science Analysis, Visualization and Informatics Lab-space [AnVIL](https://anvilproject.org/)
 * NCPI FHIR Working Group, Robert Carroll (VUMC), Allison Heath (CHOP) 
 * Center for Translational Data Science (UChicago) [gen3](https://gen3.org/)
+* [ncpi-fhir-pfb-prototype](https://github.com/NimbusInformatics/ncpi-fhir-pfb-prototype) Brian O'Connor (Broad), Ann Van (Nimbus Informatics)
 * GA4GH [cohort-rep-hackathon](https://github.com/ga4gh/cohort-rep-hackathon) synthea
 
 ## Getting Started
