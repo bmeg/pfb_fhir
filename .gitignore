@@ -136,3 +136,4 @@ notes.md
 synthea-with-dependencies.jar
 DEMO
 *.prof
+.DS_Store

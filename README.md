@@ -45,7 +45,7 @@ Render a PFB graph from FHIR data
 ### Special thanks
 * [Kyle Ellrott](ellrottlab.org) (OHSU) 
 * NHGRI Genomic Data Science Analysis, Visualization and Informatics Lab-space [AnVIL](https://anvilproject.org/)
-* NCPI FHIR Working Group, Robert Carroll (VUMC), Allison Heath (CHOP) 
+* [NCPI FHIR Working Group](https://nih-ncpi.github.io/ncpi-fhir-ig/), Robert Carroll (VUMC), Allison Heath (CHOP) 
 * Center for Translational Data Science (UChicago) [gen3](https://gen3.org/)
 * [ncpi-fhir-pfb-prototype](https://github.com/NimbusInformatics/ncpi-fhir-pfb-prototype) Brian O'Connor (Broad), Ann Van (Nimbus Informatics)
 * GA4GH [cohort-rep-hackathon](https://github.com/ga4gh/cohort-rep-hackathon) synthea
@@ -142,6 +142,11 @@ pfb_fhir inspect --pfb_path  DEMO/dbgap/output/dbgap.pfb.avro
 # use gen3's pfb utility
 cat DEMO/dbgap/output/dbgap.pfb.avro | pfb show stats 
 
+# or native avro tools
+java -jar avro-tools-1.11.0.jar getschema DEMO/dbgap/output/dbgap.pfb.avro | \
+jq '.fields[] | select(.name == "object") | .type[] | .name '
+
+
 ```
 
 
@@ -162,6 +167,8 @@ gsutil signurl -u  $GOOGLE_BUCKET/synthea.pfb.avro
 # Or, grant access
 # gsutil acl ch -u AllUsers:R  $GOOGLE_BUCKET/synthea.pfb.avro
 
+# url encode the signed url
+ 
 open 'https://app.terra.bio/#import-data?format=PFB&url=https:....'
 ```
 

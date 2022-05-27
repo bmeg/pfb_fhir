@@ -269,7 +269,8 @@ def ncpi(ctx):
       --input_path '{ncpi_path}/examples/Specimen-specimen-example-1.json' \
       --input_path '{ncpi_path}/examples/PractitionerRole-practitioner-role-example-1.json' \
       --input_path '{ncpi_path}/examples/Practitioner-practitioner-example-1.json' \
-      --input_path '{ncpi_path}/examples/Organization-organization-example-1.json'
+      --input_path '{ncpi_path}/examples/Organization-organization-example-1.json' \
+      --input_path '{ncpi_path}/examples/Observation-research-study-example-1.json'
       """
 
     figure_script = f"""

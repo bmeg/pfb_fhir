@@ -3,10 +3,18 @@ from _pytest.fixtures import fixture
 
 
 @fixture
-def input_paths():
+def input_ncpi_patient_paths():
     """File paths."""
     return [
         'tests/fixtures/ncpi/examples/Patient-patient-example-3.json'
+        ]
+
+
+@fixture
+def input_synthea_patient_paths():
+    """File paths."""
+    return [
+        'tests/fixtures/synthea/filtered/Patient.ndjson'
         ]
 
 
