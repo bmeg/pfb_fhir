@@ -42,13 +42,13 @@ def test_model(config_path):
             assert found, f"{suffix} not found"
 
 
-def test_emitter(config_path, input_ncpi_patient_paths, output_path, pfb_path):
+def test_emitter(config_path, input_paths, output_path, pfb_path):
     """Test Input Files vs emitted PFB ."""
     model = initialize_model(config_path)
 
     # start_profiler()
     with pfb(output_path, pfb_path, model) as pfb_:
-        for context in process_files(model, input_ncpi_patient_paths):
+        for context in process_files(model, input_paths):
             if not context.properties:
                 continue
             pfb_.emit(context)

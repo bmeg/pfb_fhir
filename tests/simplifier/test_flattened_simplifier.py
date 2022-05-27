@@ -67,6 +67,7 @@ def test_flattened_synthea_patient_model(config_path, input_synthea_patient_path
             assert len(simplified_properties['Patient.address']) == 10
             simplified_properties = ContextSimplifier._extensions(simplified_properties)
             assert len(simplified_properties['Patient.extension']) == 4, "Should simplify root extensions"
+            logger.warning("TODO - expected error.  Improve ContextSimplifier.")
             assert len(simplified_properties['Patient.address']) < 10, f"Should simplify property extensions {[p.flattened_key for p in simplified_properties['Patient.address'] if 'extension' in p.flattened_key]}"
             simplified_properties = ContextSimplifier._single_item_lists(simplified_properties)
             simplified_properties = ContextSimplifier._codings(simplified_properties)
