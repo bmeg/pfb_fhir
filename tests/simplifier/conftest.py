@@ -19,6 +19,14 @@ def input_synthea_patient_paths():
 
 
 @fixture
+def input_synthea_observation_paths():
+    """File paths."""
+    return [
+        'tests/fixtures/synthea/filtered/Observation.ndjson'
+        ]
+
+
+@fixture
 def config_path():
     """Fixture where to read config."""
     return 'tests/fixtures/ncpi/config.yaml'
