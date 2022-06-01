@@ -891,3 +891,7 @@ years_smoked_gt89:
     cde_id: 3137957
     cde_version: 1.0
     term_url: "https://cdebrowser.nci.nih.gov/CDEBrowser/search?elementDetails=9&FirstTimer=0&PageId=ElementDetailsGroup&publicId=3137957&version=1.0"
+
+ga4gh_drs_uri:
+  description: >
+    DRS URI as defined by GA4GH DRS spec for pointers to file objects.
