@@ -11,9 +11,13 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # setup app
 WORKDIR /app
 
-RUN git clone --branch 0.0.0 https://github.com/bmeg/pfb_fhir /app/pfb_fhir
+RUN git clone --branch main https://github.com/bmeg/pfb_fhir /app/pfb_fhir
 WORKDIR /app/pfb_fhir
 
 RUN pip install -e .
 
+# build
+# docker build -t pfb_fhir .
+# typical run command
+# docker run -v $(pwd)/cache:/app/pfb_fhir/cache -v $(pwd)/DEMO:/app/pfb_fhir/DEMO pfb_fhir demo ncpi
 ENTRYPOINT ["pfb_fhir"]
