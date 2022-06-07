@@ -11,10 +11,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # setup app
 WORKDIR /app
 
-RUN git clone --branch main https://github.com/bmeg/pfb_fhir /app/pfb_fhir
-WORKDIR /app/pfb_fhir
-
-RUN pip install -e .
+RUN pip install pfb_fhir
 
 # build
 # docker build -t pfb_fhir .
