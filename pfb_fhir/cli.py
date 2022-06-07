@@ -3,7 +3,6 @@
 import glob
 import json
 import os
-import subprocess
 from typing import Iterator
 from pathlib import Path
 
@@ -21,7 +20,7 @@ from pfb_fhir.emitter import pfb
 from pfb_fhir.model import TransformerContext
 from pfb_fhir.observable import ObservableData
 from pfb_fhir.emitter import inspect_pfb
-from pfb_fhir.simplifier import ContextSimplifier
+from pfb_fhir.context_simplifier import ContextSimplifier
 
 LOG_FORMAT = '%(asctime)s %(name)s %(levelname)-8s %(message)s'
 logger = logging.getLogger(__name__)
@@ -69,7 +68,7 @@ def transform(ctx, input_path, pfb_path, simplify):
         return
 
     with pfb(ctx.obj['output_path'], pfb_path, model) as pfb_:
-        for context in process_files(model, input_path):
+        for context in process_files(model, input_path, simplify=simplify):
             pfb_.emit(context)
 
 

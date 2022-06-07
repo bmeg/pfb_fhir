@@ -11,6 +11,14 @@ def input_ncpi_patient_paths():
 
 
 @fixture
+def input_ncpi_specimen_paths():
+    """File paths."""
+    return [
+        'tests/fixtures/ncpi/examples/Specimen-specimen-example-1.json',
+        ]
+
+
+@fixture
 def input_synthea_patient_paths():
     """File paths."""
     return [
