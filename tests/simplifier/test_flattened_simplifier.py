@@ -1,18 +1,11 @@
 import os
-from collections import defaultdict
-from copy import copy, deepcopy
-from typing import Dict
 
+import logging
 from pfb_fhir import initialize_model
 from pfb_fhir.cli import process_files
 from pfb_fhir.emitter import pfb, inspect_pfb
-from pfb_fhir.model import Property
-
-import logging
-
-from pfb_fhir.simplifier import ContextSimplifier
+from pfb_fhir.context_simplifier import ContextSimplifier
 from tests import cleanup_emitter
-
 logger = logging.getLogger(__name__)
 
 
@@ -46,7 +39,7 @@ def test_flattened_ncpi_patient_model(config_path, input_ncpi_patient_paths):
              'contact.telecom.use', 'contact.telecom.rank', 'contact.address.use', 'contact.address.type',
              'contact.address.text', 'contact.address.line', 'contact.address.city', 'contact.address.state',
              'contact.address.postalCode', 'contact.gender', 'contact.relationship.v2-0131',
-             'contact.relationship.v2-0131.display', 'us-core-race.ombCategory', 'us-core-race.detailed',
+             'us-core-race.ombCategory', 'us-core-race.detailed',
              'us-core-race.text', 'us-core-ethnicity.ombCategory', 'us-core-ethnicity.text'}
             assert expected_keys == actual_keys
             _to_tsv(context.properties)
@@ -94,8 +87,8 @@ def test_flattened_synthea_patient_model(config_path, input_synthea_patient_path
             simplified_properties = ContextSimplifier._codings(simplified_properties)
             marital_status_keys = [p.flattened_key for p in simplified_properties['Patient.maritalStatus']]
             communication_keys = [p.flattened_key for p in simplified_properties['Patient.communication']]
-            assert set(marital_status_keys) == {'maritalStatus.text', 'maritalStatus.v3-MaritalStatus', 'maritalStatus.v3-MaritalStatus.display'}, "Should simplify codings"
-            assert set(communication_keys) == {'communication.language.text', 'communication.language.urn:ietf:bcp:47', 'communication.language.urn:ietf:bcp:47.display'}, "Should simplify codings"
+            assert set(marital_status_keys) == {'maritalStatus.text', 'maritalStatus.v3-MaritalStatus'}, "Should simplify codings"
+            assert set(communication_keys) == {'communication.language.text', 'communication.language.urn:ietf:bcp:47'}, "Should simplify codings"
             simplified_properties = ContextSimplifier._identifiers(simplified_properties)
             identifier_keys = [p.flattened_key for p in simplified_properties['Patient.identifier']]
             assert set(identifier_keys) == {'identifier.0.synthea', 'identifier.1.MR', 'identifier.2.SS',
@@ -120,7 +113,6 @@ def test_flattened_synthea_patient_model(config_path, input_synthea_patient_path
                              'birthDate',
                              'communication.language.text',
                              'communication.language.urn:ietf:bcp:47',
-                             'communication.language.urn:ietf:bcp:47.display',
                              'gender',
                              'id',
                              'identifier.0.synthea',
@@ -130,7 +122,6 @@ def test_flattened_synthea_patient_model(config_path, input_synthea_patient_path
                              'identifier.4.PPN',
                              'maritalStatus.text',
                              'maritalStatus.v3-MaritalStatus',
-                             'maritalStatus.v3-MaritalStatus.display',
                              'meta.profile',
                              'multipleBirthBoolean',
                              'name.0.family',
@@ -163,7 +154,7 @@ def test_flattened_ncpi_patient_emitter(config_path, input_ncpi_patient_paths, o
     model = initialize_model(config_path)
 
     with pfb(output_path, pfb_path, model) as pfb_:
-        for context in process_files(model, input_ncpi_patient_paths):
+        for context in process_files(model, input_ncpi_patient_paths, simplify=True):
             pfb_.emit(context)
 
     assert os.path.isfile(pfb_path)
@@ -174,6 +165,17 @@ def test_flattened_ncpi_patient_emitter(config_path, input_ncpi_patient_paths, o
     cleanup_emitter(output_path, pfb_path)
 
 
+def test_flattened_ncpi_specimen_model(config_path, input_ncpi_specimen_paths, output_path, pfb_path):
+    """Borrows fixtures from ncpi fhir resources."""
+    model = initialize_model(config_path)
+    for file in input_ncpi_specimen_paths:
+        for context in process_files(model, file, simplify=True):
+            actual_keys = set([k for k in context.properties])
+            assert '_receivedTime.extension.0.extension.0.url' not in actual_keys
+            print(actual_keys)
+            break
+
+
 def test_flattened_synthea_observation_model(config_path, input_synthea_observation_paths):
     """Borrows fixtures from synthea fhir resources."""
     model = initialize_model(config_path)
@@ -181,5 +183,9 @@ def test_flattened_synthea_observation_model(config_path, input_synthea_observat
     for file in input_synthea_observation_paths:
         for context in process_files(model, file, simplify=True):
             actual_keys = set([k for k in context.properties])
-            assert actual_keys == {'category.observation-category', 'code.text', 'effectiveDateTime', 'valueQuantity.unit', 'resourceType', 'category.observation-category.display', 'meta.profile.1', 'id', 'code.loinc.org.display', 'subject.reference', 'status', 'meta.profile.0', 'valueQuantity.value', 'encounter.reference', 'issued', 'valueQuantity.code', 'code.loinc.org', 'valueQuantity.system'}
+            assert actual_keys == {'category.observation-category', 'code.text', 'effectiveDateTime',
+                                   'valueQuantity.unit', 'resourceType',
+                                   'meta.profile.1', 'id', 'subject.reference', 'status',
+                                   'meta.profile.0', 'valueQuantity.value', 'encounter.reference', 'issued',
+                                   'valueQuantity.code', 'code.loinc.org', 'valueQuantity.system'}
             break

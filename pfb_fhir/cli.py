@@ -20,7 +20,7 @@ from pfb_fhir.emitter import pfb
 from pfb_fhir.model import TransformerContext
 from pfb_fhir.observable import ObservableData
 from pfb_fhir.emitter import inspect_pfb
-from pfb_fhir.simplifier import ContextSimplifier
+from pfb_fhir.context_simplifier import ContextSimplifier
 
 LOG_FORMAT = '%(asctime)s %(name)s %(levelname)-8s %(message)s'
 logger = logging.getLogger(__name__)
