@@ -3,7 +3,6 @@
 import glob
 import json
 import os
-import subprocess
 from typing import Iterator
 from pathlib import Path
 
@@ -69,7 +68,7 @@ def transform(ctx, input_path, pfb_path, simplify):
         return
 
     with pfb(ctx.obj['output_path'], pfb_path, model) as pfb_:
-        for context in process_files(model, input_path):
+        for context in process_files(model, input_path, simplify=simplify):
             pfb_.emit(context)
 
 
