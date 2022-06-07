@@ -48,11 +48,15 @@ def resource_handler(entity: Entity, observable: ObservableData, context: Transf
     # separate into  dot notation key & val
     properties = {k: {'value': v} for k, v in flatten(observable.payload, '.').items()}
 
-    # Initialize
+    # Initialize in memory cache
+    # it is technically possible to mix simplify T/F between calls
+    # the lookups are different depending on setting, so include that
+    # in the cache key.
+    cache_key = f"{entity.id}:{context.simplify}"
     if entity.id not in WALKED_PROPERTIES:
-        WALKED_PROPERTIES[entity.id] = {}
+        WALKED_PROPERTIES[cache_key] = {}
     # for this entity
-    walked_properties = WALKED_PROPERTIES[entity.id]
+    walked_properties = WALKED_PROPERTIES[cache_key]
 
     # retrieve definition for each element.
     resource_properties: Dict[str, Property] = {}

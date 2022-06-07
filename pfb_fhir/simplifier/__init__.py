@@ -1,11 +1,11 @@
 """package."""
 from collections import defaultdict
-from copy import copy, deepcopy
-from typing import Any, Dict, List
+from copy import deepcopy
+from typing import Dict, List
 
 import logging
 
-from pydantic import BaseModel
+from urllib.parse import urlparse
 
 from pfb_fhir.model import TransformerContext
 
@@ -26,6 +26,7 @@ class ContextSimplifier(object):
         simplified_properties = ContextSimplifier._extensions(simplified_properties)
         simplified_properties = ContextSimplifier._single_item_lists(simplified_properties)
         simplified_properties = ContextSimplifier._codings(simplified_properties)
+        simplified_properties = ContextSimplifier._identifiers(simplified_properties)
         # logger.info([p.flattened_key for p in context.properties.values()])
         context.properties = {}
         for k, properties in simplified_properties.items():
@@ -49,6 +50,10 @@ class ContextSimplifier(object):
         for i in range(3):
             logger.debug(f"iterate {i}")
             for k, properties in simplified_properties.items():
+                entity, property_name = k.split('.')
+                # ignore identifier array, handled separately
+                if property_name == 'identifier':
+                    continue
                 flattened_keys = [p.flattened_key for p in properties]
                 for flattened_key in flattened_keys:
                     flattened_key_parts = flattened_key.split('.')
@@ -68,10 +73,11 @@ class ContextSimplifier(object):
 
     @staticmethod
     def _extensions(simplified_properties: Dict[str, List]) -> Dict[str, List]:
-        """Simplify values with extensions."""
+        """Simplify root values with extensions."""
         simplified_extensions = []
         simplified_extensions_key = None
         for k, properties in simplified_properties.items():
+            # root extensions
             if not k.endswith('extension'):
                 continue
             simplified_extensions_key = k
@@ -117,6 +123,53 @@ class ContextSimplifier(object):
             del simplified_properties[simplified_extensions_key]
             simplified_properties[simplified_extensions_key] = simplified_extensions
 
+        return ContextSimplifier._property_extensions(simplified_properties)
+
+    @staticmethod
+    def _property_extensions(simplified_properties: Dict[str, List]) -> Dict[str, List]:
+        """Simplify root values with extensions."""
+        simplified_extensions = {}
+        for k, properties in simplified_properties.items():
+            # property extensions
+            items_to_remove = []
+            items_to_add = []
+            extensions = defaultdict(dict)
+            for p in properties:
+                if 'extension' not in p.flattened_key:
+                    continue
+                key_parts = p.flattened_key.split('.')
+                path = '.'.join(key_parts[:-1])
+                key = key_parts[-1]
+                extensions[path][key] = p
+            if len(extensions.keys()) > 0:
+                # how many extensions are there for this property?
+                extension_instances = []
+                for extension_instance in extensions.keys():
+                    if extension_instance.count('extension') == 1:
+                        extension_instances.append(extension_instance)
+                for extension_instance in extension_instances:
+                    property_key = extension_instance.split('extension')[0]
+                    for extension_key in extensions:
+                        if extension_key.startswith(extension_instance) and extension_key != extension_instance:
+                            extension_name = extensions[extension_instance]['url'].value.split('/')[-1]
+                            sub_extension_name = extensions[extension_key]['url'].value.split('/')[-1]
+                            sub_extension_value = next(iter(v_ for k_, v_ in extensions[extension_key].items() if k_.startswith('value') ), None)
+                            simplified_property = deepcopy(sub_extension_value)
+                            simplified_property.flattened_key = f"{property_key}{extension_name}.{sub_extension_name}"
+                            items_to_add.append(simplified_property)
+                            items_to_remove.extend(extensions.keys())
+            if len(items_to_add) > 0:
+                filtered_properties = []
+                for p in properties:
+                    if any([p.flattened_key.startswith(partial_key) for partial_key in items_to_remove]):
+                        continue
+                    filtered_properties.append(p)
+                properties = filtered_properties
+                properties.extend(items_to_add)
+                simplified_extensions[k] = properties
+
+        for k in simplified_extensions:
+            simplified_properties[k] = simplified_extensions[k]
         return simplified_properties
 
     @staticmethod
@@ -155,6 +208,53 @@ class ContextSimplifier(object):
                     simplified_coding_values.append(simplified_coding)
             simplified_properties[k].extend(simplified_coding_values)
         for k, original_coded_values in original_coded_values.items():
+            # logger.info([(k, p.flattened_key) for p in simplified_properties[k] if p.flattened_key not in original_coded_values])
             simplified_properties[k] = [p for p in simplified_properties[k] if
                                         p.flattened_key not in original_coded_values]
         return simplified_properties
+
+    @staticmethod
+    def _identifiers(simplified_properties: Dict[str, List]) -> Dict[str, List]:
+        """Simplify identifier to single property"""
+        for k, properties in simplified_properties.items():
+            entity, property_name = k.split('.')
+            # ignore identifier array, handled separately
+            if property_name != 'identifier':
+                continue
+            items_to_remove = []
+            items_to_add = []
+            index = 0
+            while True:
+                identifier_properties = [p for p in properties if p.flattened_key.startswith(f"identifier.{index}")]
+                if len(identifier_properties) == 0:
+                    break
+                system = next(iter([p for p in identifier_properties if p.flattened_key == f"identifier.{index}.system"]), None)
+                value = next(iter([p for p in identifier_properties if p.flattened_key == f"identifier.{index}.value"]), None)
+                type_code_value = next(iter([p.value for p in identifier_properties if p.flattened_key == f"identifier.{index}.type.coding.0.code"]), None)
+                # logger.info((system.value, value.value, type_code_value))
+                system_name = type_code_value
+                if not system_name:
+                    url_parts = urlparse(system.value)
+                    if url_parts.path:
+                        system_name = url_parts.path.split('/')[-1]
+                    else:
+                        netloc_parts = url_parts.netloc.split('.')
+                        system_name = netloc_parts[-2] if len(netloc_parts) > 2 else netloc_parts[-1]
+                # logger.info((f"identifier.{index}.{system_name}", value.value))
+                items_to_remove.extend([p.flattened_key for p in identifier_properties])
+                simplified_identifier = deepcopy(value)
+                simplified_identifier.flattened_key = f"identifier.{index}.{system_name}"
+                items_to_add.append(simplified_identifier)
+                index += 1
+            if len(items_to_add) > 0:
+                filtered_properties = []
+                for p in properties:
+                    if any([p.flattened_key.startswith(partial_key) for partial_key in items_to_remove]):
+                        continue
+                    filtered_properties.append(p)
+                properties = filtered_properties
+                properties.extend(items_to_add)
+                simplified_properties[k] = properties
+
+        return simplified_properties
+

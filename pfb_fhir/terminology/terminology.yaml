@@ -23,5 +23,8 @@ valuesets:
   - 'fullUrl': 'http://hl7.org/fhir/R4/valueset-marital-status'
     'valueset': 'http://hl7.org/fhir/R4/valueset-marital-status.json'
     'codesystem': 'https://terminology.hl7.org/3.1.0/CodeSystem-v3-MaritalStatus.json'
-
+  # research-subject-status
+  - 'fullUrl': 'http://hl7.org/fhir/ValueSet/research-subject-status'
+    'valueset': 'http://hl7.org/fhir/R4/valueset-research-subject-status.json'
+    'codesystem': 'http://hl7.org/fhir/R4/codesystem-research-subject-status.json'
 
