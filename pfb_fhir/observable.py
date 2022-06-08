@@ -1,7 +1,7 @@
 """Class hierarchy of Model."""
 
 import uuid
-from typing import Any, Callable
+from typing import Any, Callable, List, Optional
 
 from pydantic import BaseModel
 from pydantic_yaml import YamlModelMixin
@@ -20,7 +20,7 @@ class ObservableData(BaseModel):
     """Envelope."""
     payload: Any
     """The source data."""
-    observers: list[Callable]
+    observers: List[Callable]
     """A list of handlers."""
     # TODO What we really want here is a list of Observer,
     #   but that creates a circular reference, perhaps a python 'interface'?

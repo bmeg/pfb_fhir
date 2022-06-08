@@ -3,10 +3,11 @@
 import json
 import os
 from copy import deepcopy
-from typing import Optional, Dict, Any, List, OrderedDict
+from typing import Optional, Dict, Any, List, OrderedDict, Union
 import collections
 
 import requests
+import yaml
 from pydantic import BaseModel, PrivateAttr
 import logging
 
@@ -280,6 +281,23 @@ class Model(Command):
 
     entities: Optional[OrderedDict[str, Entity]] = collections.OrderedDict()
     dependency_order: Optional[List[str]] = []
+
+    @staticmethod
+    def parse_file(path: str) -> Any:
+        """Use entity_name, the map key  as id."""
+        with open(path) as fp:
+            config = yaml.safe_load(fp)
+
+        for entity_name, entity in config['entities'].items():
+            if 'id' not in entity:
+                entity['id'] = entity_name
+            if 'links' in entity:
+                assert isinstance(entity['links'], dict)
+                for link_name, link in entity['links'].items():
+                    if 'id' not in link:
+                        link['id'] = link_name
+
+        return Model.parse_obj(config)
 
     def notify(self, observable: ObservableData, context: Context = None, *args, **kwargs) -> None:
         """NO-OP, entities process the data."""
