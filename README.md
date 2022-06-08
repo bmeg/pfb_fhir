@@ -243,7 +243,33 @@ Brian Walsh - [@bpwalsh](https://twitter.com/bpwalsh) - walsbr AT ohsu DOT edu
   * ✅ include kids first
   * ✅ simplify
   * ✅ add genomic reporting [examples](http://hl7.org/fhir/uv/genomics-reporting/artifacts.html#example-example-instances)
-  * [ ] 🚧 pypi
+  * ✅ pypi
+
+## Distribution
+
+### Test with docker
+
+```commandline
+
+docker build -t pfb_fhir .
+
+# typical run command
+docker run -v $(pwd)/cache:/app/pfb_fhir/cache -v $(pwd)/DEMO:/app/pfb_fhir/DEMO pfb_fhir demo ncpi
+
+```
+
+### Update pypi
+
+```
+export TWINE_USERNAME=  #  the username to use for authentication to the repository.
+export TWINE_PASSWORD=  # the password to use for authentication to the repository.
+
+rm -r dist/
+python3  setup.py sdist bdist_wheel
+twine upload dist/*
+
+```
+
   
 ## Known Issues
   * `simplify` - could do a better job of making resulting nodes more "data frame friendly"

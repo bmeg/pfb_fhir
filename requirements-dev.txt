@@ -1,7 +1,7 @@
 pre-commit
 sphinx
 sphinx_rtd_theme
-twine
+twine<2
 flake8
 flake8-docstrings
 pytest==7.1.1
