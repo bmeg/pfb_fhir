@@ -59,6 +59,9 @@ entities:
         targetProfile: http://hl7.org/fhir/StructureDefinition/Organization
     # optional explicit url for the profile.
     source: null
+    # optional override of simple model's submitter_id
+    submitter_id:
+      identifier_system: http://standardhealthrecord.org/fhir/StructureDefinition/passportNumber
 
 
   ResearchSubject:
@@ -78,6 +81,8 @@ entities:
       subject:
         required: true
         targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+    submitter_id:
+      identifier_system: http://standardhealthrecord.org/fhir/StructureDefinition/passportNumber
     source: null
 
   Task:

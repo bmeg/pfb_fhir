@@ -137,6 +137,11 @@ class Constant(Element):
     value: str
 
 
+class SubmitterIdAlias(BaseModel):
+    """Property constant."""
+    identifier_system: str
+
+
 class Entity(Element, Command):
     """A FHIR resource, or embedded profile."""
 
@@ -146,6 +151,8 @@ class Entity(Element, Command):
     """Narrow the scope of links."""
     source: Optional[str]
     """Explicit url for the profile."""
+    submitter_id: Optional[SubmitterIdAlias] = None
+    """Alias for submitter_id."""
     _profile: dict = PrivateAttr()
     """Actual profile."""
     _handler: Any = PrivateAttr()

@@ -314,8 +314,32 @@ class PFBJsonEmitter(Emitter):
         # create simple flat json
         flattened = {p.flattened_key.replace('.', '_'): p.value for p in context.properties.values()}
         flattened['links'] = links
-        flattened['submitter_id'] = context.resource['id']
 
+        #
+        # ensure "simple model" fields exist
+        #
+
+        # submitter_id from context.entity
+        if context.entity.submitter_id:
+            for identifier in context.resource['identifier']:
+                if identifier['system'] == context.entity.submitter_id.identifier_system:
+                    flattened['submitter_id'] = identifier['value']
+        else:
+            flattened['submitter_id'] = context.resource['id']
+
+        # gh4gh_drs_uri from context.entity
+        if context.resource['resourceType'] == 'DocumentReference':
+            flattened['gh4gh_drs_uri'] = None
+            if 'content' in context.resource:
+                for content in context.resource['content']:
+                    if 'attachment' in content:
+                        attachment = content['attachment']
+                        url = attachment.get('url', None)
+                        if url and url.startswith('drs'):
+                            flattened['gh4gh_drs_uri'] = url
+        #
+        # create the pfb record
+        #
         pfb_record = {'id': flattened['id'], 'name': context.entity.id}
         if 'links' in flattened:
             relations = flattened['links']
@@ -328,7 +352,7 @@ class PFBJsonEmitter(Emitter):
         return pfb_record
 
     def _link_submitter_id(self, fhir_reference):
-        """Transform to PFB friendly submitter_id link."""
+        """Transform to PFB friendly submitter id, in this sense submitter_id is the id used in the link, not the submitter_id in the resource."""
         if 'reference' in fhir_reference:
             if '?identifier' in fhir_reference['reference']:
                 resource_type = fhir_reference['reference'].split('?')[0]

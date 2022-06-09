@@ -51,6 +51,13 @@ def test_emitter(config_path, input_ncpi_patient_paths, output_path, pfb_path):
     assert len(results.errors) == 0, results.errors
     assert len(results.warnings) == 0, results.warnings
 
+    with open(f"{output_path}/pfb/DocumentReference.ndjson") as fp:
+        patient = json.loads(fp.readline())
+        properties = patient['object']
+        assert properties['id']
+        assert properties['gh4gh_drs_uri']
+        assert properties['gh4gh_drs_uri'].startswith('drs')
+
     cleanup_emitter(output_path, pfb_path)
 
 
