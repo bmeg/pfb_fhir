@@ -2,10 +2,13 @@ pre-commit
 sphinx
 sphinx_rtd_theme
 twine<2
+
 flake8
 flake8-docstrings
 pytest==7.1.1
 pytest-cov==3.0.0
 wheel
+# see https://github.com/csachs/pyproject-flake8
+# Call pflake8 instead of flake8.
 pyproject-flake8
 jsonpath_ng
