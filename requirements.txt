@@ -5,7 +5,7 @@ requests==2.27.1
 setuptools==62.2.0
 # pandas
 # numpy
-fhirclientr4
+fhirclientr4e==4.0.7
 
 pydantic~=1.9.0
 pydantic_yaml
