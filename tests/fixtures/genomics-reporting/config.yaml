@@ -76,6 +76,15 @@ entities:
         targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
     source: https://nih-ncpi.github.io/ncpi-fhir-ig/StructureDefinition-family-relationship.json
 
+
+  PlanDefinition:
+    category: Administrative
+    links:
+      subjectReference:
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+    source: null
+
   Observation:
     category: Clinical
     links:
@@ -88,6 +97,9 @@ entities:
       subject:
         required: false
         targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
+      extension:
+        required: false
+        targetProfile: http://hl7.org/fhir/StructureDefinition/PlanDefinition
     source: null
 
   Questionnaire:
@@ -131,14 +143,6 @@ entities:
         targetProfile: http://hl7.org/fhir/StructureDefinition/DocumentReference
     source: https://nih-ncpi.github.io/ncpi-fhir-ig/StructureDefinition-ncpi-specimen-task.json
 
-
-  PlanDefinition:
-    category: Administrative
-    links:
-      subject:
-        required: false
-        targetProfile: http://hl7.org/fhir/StructureDefinition/Patient
-    source: null
 
   DiagnosticReport:
       category: Clinical
