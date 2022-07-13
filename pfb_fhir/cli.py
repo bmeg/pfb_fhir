@@ -16,11 +16,9 @@ from fhirclient.models.domainresource import DomainResource
 from importlib_metadata import distribution
 
 from pfb_fhir import NaturalOrderGroup, DEFAULT_OUTPUT_PATH, DEFAULT_CONFIG_PATH, initialize_model, run_cmd
-from pfb_fhir.context_simplifier import ContextSimplifier
 from pfb_fhir.emitter import inspect_pfb
 from pfb_fhir.emitter import pfb
 from pfb_fhir.model import TransformerContext
-from pfb_fhir.observable import ObservableData
 
 LOG_FORMAT = '%(asctime)s %(name)s %(levelname)-8s %(message)s'
 logger = logging.getLogger(__name__)
@@ -59,8 +57,9 @@ def version():
 @click.option('--input_path',  multiple=True, help='FHIR resources paths.')
 @click.option('--pfb_path', help='Location to write PFB.')
 @click.option('--simplify', is_flag=True, show_default=True, default=False, help="Remove FHIR scaffolding, make data frame friendly.")
+@click.option('--strict', is_flag=True, show_default=True, default=False, help="Stop on any FHIR validation error.")
 @click.pass_context
-def transform(ctx, input_path, pfb_path, simplify):
+def transform(ctx, input_path, pfb_path, simplify, strict):
     """Transform FHIR resources from directory."""
     model = ctx.obj['model']
     if not model:
@@ -68,7 +67,7 @@ def transform(ctx, input_path, pfb_path, simplify):
         return
 
     with pfb(ctx.obj['output_path'], pfb_path, model) as pfb_:
-        for context in process_files(model, input_path, simplify=simplify):
+        for context in process_files(model, input_path, simplify=simplify, strict=strict):
             pfb_.emit(context)
 
 

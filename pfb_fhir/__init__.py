@@ -5,7 +5,6 @@ from collections import OrderedDict
 import click
 import yaml
 
-from pfb_fhir.handlers import handler_factory
 from pfb_fhir.model import Model
 import logging
 import cProfile, pstats

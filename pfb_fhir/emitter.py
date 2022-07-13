@@ -105,7 +105,7 @@ class DictionaryEmitter(Emitter):
         schema['id'] = context.entity.id
         schema['title'] = context.entity.id
         schema['category'] = context.entity.category
-        schema['description'] = context.entity.profile['description']
+        schema['description'] = context.resource.__doc__
         schema['links'] = [link for link in self.render_links(context)]
         schema['required'] = [required.replace('.', '_') for required in self.render_required(context)]
         for property_name, schema_property in self.render_property(context):

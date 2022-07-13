@@ -9,12 +9,9 @@ from typing import Optional, Dict, Any, List, OrderedDict
 
 import requests
 import yaml
-from fhirclient.models.fhirabstractbase import FHIRAbstractBase
 from fhirclient.models.resource import Resource
 from flatten_json import flatten
 from pydantic import BaseModel, PrivateAttr
-
-from pfb_fhir.observable import Command, ObservableData, Context
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +142,7 @@ class SubmitterIdAlias(BaseModel):
     identifier_system: str
 
 
-class Entity(Element, Command):
+class Entity(Element):
     """A FHIR resource, or embedded profile."""
 
     category: str
@@ -156,108 +153,6 @@ class Entity(Element, Command):
     """Explicit url for the profile."""
     submitter_id: Optional[SubmitterIdAlias] = None
     """Alias for submitter_id."""
-    _profile: dict = PrivateAttr()
-    """Actual profile."""
-    _handler: Any = PrivateAttr()
-    """Method that processes this entity. TODO - should be callable?"""
-    # TODO should be callable?
-    _element_lookup: Dict[str, dict] = PrivateAttr()
-
-    def __init__(self, **data):
-        """Retrieve the fhir schema for this entity, make schema searchable."""
-        super().__init__(**data)
-        self._profile = fhir_profile_retriever.get_profile(self.id, self.source)
-        self._ensure_element_lookup()
-
-    @property
-    def profile(self):
-        """Getter."""
-        return self._profile
-
-    @property
-    def handler(self):
-        """Getter."""
-        return self._handler
-
-    @property
-    def element_lookup(self):
-        """Getter."""
-        return self._element_lookup
-
-    # doesn't work see https://github.com/samuelcolvin/pydantic/issues/1577#issuecomment-790506164
-    # @property.setter
-    # def handler(self, handler):
-    #     self._handler = handler
-    # TODO - for now, java style setter
-    def set_handler(self, handler):
-        """Setter."""
-        self._handler = handler
-
-    def notify(self, observable: ObservableData, context: Context = None, *args, **kwargs) -> None:
-        """Delegate to handler."""
-        self._handler(entity=self, observable=observable, context=context, *args, **kwargs)
-
-    def interested(self, observable: ObservableData) -> bool:
-        """Return True if data matches our profile."""
-        if isinstance(observable.payload, dict):
-            return self.id == observable.payload.get('resourceType', None)
-
-        if isinstance(observable.payload, Property):
-            starting_element = observable.payload.root_element
-            if len(observable.payload.leaf_elements) > 0:
-                starting_element = observable.payload.leaf_elements[-1]
-            for observable_type in starting_element['type']:
-                if not isinstance(observable_type, dict):
-                    Exception('?')
-                if observable_type.get('code', None) == self.id:
-                    return True
-                if observable_type.get('code', None) in FHIR_TYPES:
-                    json_type = FHIR_TYPES[observable_type['code']].json_type
-                    return json_type == self.id
-
-        else:
-            assert False, (observable.payload.__class__.__name__, observable.payload.parent_definition['type'], self.id)
-
-    def fetch_profile(self):
-        """Fetch FHIR sub profiles."""
-        for profile in fhir_profile_retriever.fetch_all(self._profile):
-            yield profile
-
-    def _ensure_element_lookup(self):
-        """Add lookup dict of properties and expand value[x].
-
-        see https://build.fhir.org/formats.html#choice
-        """
-
-        def _camel_case(code_: str) -> str:
-            """Return entity type from code."""
-            if code_.lower() == 'datetime':
-                return 'DateTime'
-            if code_.lower() == 'codeableconcept':
-                return 'CodeableConcept'
-            return code_.title()
-
-        elements = {element['id']: element for element in self._profile['snapshot']['element']}
-        new_elements = {}
-        to_delete = []
-        for id_, element in elements.items():
-            if '[x]' in id_:
-                base = id_.replace('[x]', '')
-                for type_ in element['type']:
-                    code = type_['code']
-                    new_element = deepcopy(element)
-                    new_element['id'] = f"{base}{_camel_case(code)}"
-                    new_element['type'] = [type_]
-                    new_elements[new_element['id']] = new_element
-                to_delete.append(id_)
-        if len(to_delete) > 0:
-            # logger.info(f"Removing {to_delete}")
-            for id_ in to_delete:
-                elements.pop(id_)
-            # logger.info(f"Adding {new_elements.keys()}")
-            elements = elements | new_elements
-
-        self._element_lookup = elements
 
 
 class AttributeEnum(BaseModel):
@@ -302,14 +197,7 @@ class Property(BaseModel):
     """The value."""
 
 
-class ObservableProperty(ObservableData):
-    """Overrides payload type."""
-
-    payload: Property
-    """A property in a resource"""
-
-
-class Model(Command):
+class Model(BaseModel):
     """Delegates to a collection of Entity."""
 
     entities: Optional[OrderedDict[str, Entity]] = collections.OrderedDict()
@@ -326,7 +214,7 @@ class Model(Command):
             if 'id' not in entity:
                 entity['id'] = entity_name
             if 'links' in entity:
-                assert isinstance(entity['links'], dict)
+                assert isinstance(entity['links'], dict), f"Error parsing file {path} unexpected link type for {entity_name} {entity['links']}"
                 for link_name, link in entity['links'].items():
                     if 'id' not in link:
                         link['id'] = link_name
@@ -338,29 +226,6 @@ class Model(Command):
 
         return Model.parse_obj(config)
 
-    def notify(self, observable: ObservableData, context: Context = None, *args, **kwargs) -> None:
-        """NO-OP, entities process the data."""
-        pass
-
-    def interested(self, observable: ObservableData) -> bool:
-        """Delegate to entities."""
-        return any(entity.interested(observable) for entity in self.entities)
-
-    def observe(self, observable):
-        """Register self with data if interested.
-
-        :type observable: ObservableData|list
-        """
-        assert observable
-        observable_list = observable
-        if not isinstance(observable, list):
-            observable_list = [observable]
-        for observable_ in observable_list:
-            for entity in self.entities.values():
-                if entity.interested(observable_):
-                    observable_.register_observer(entity)
-        return observable
-
     def fetch_profiles(self):
         """Ask entities to recursively fetch their FHIR profiles, add Entities to model."""
         sub_entities = []
@@ -371,6 +236,12 @@ class Model(Command):
                 sub_entities.append(Entity(id=profile['id'], profile=profile, category='sub-profile'))
         for entity in sub_entities:
             self.entities[entity.id] = entity
+
+
+class Context(BaseModel):
+    """Transient data for command(s)."""
+
+    obj: dict = {}
 
 
 class TransformerContext(Context):
@@ -461,6 +332,7 @@ class TransformerContext(Context):
                     of_many=None,
                     not_optional=False
                 )
+
 
 class EdgeSummary(BaseModel):
     """Summary of edge in PFB."""
