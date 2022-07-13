@@ -1,7 +1,7 @@
 DEMO/
 venv/
-.idea/
 DATA/
 .idea/
 synthea-with-dependencies.jar
-
+tests/
+cache/

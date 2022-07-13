@@ -1,4 +1,5 @@
 """Test synthetic data."""
+import json
 import os
 from collections import defaultdict
 
@@ -21,13 +22,13 @@ def test_model(config_path):
             assert context
             if not context.properties:
                 continue
-            for k in ['model', 'properties', 'resource', 'entity']:
+            for k in ['properties', 'resource', 'entity']:
                 assert getattr(context, k, None), f"{k} was empty"
             properties = context.properties
             resource = context.resource
-            assert resource['id'] and resource['resourceType']
+            assert resource.id and resource.resource_type
             assert properties['id']
-            resource_properties[resource['resourceType']].update(properties.keys())
+            resource_properties[resource.resource_type].update(properties.keys())
 
     assert 'multipleBirthBoolean' in resource_properties['Patient']
     assert 'deceasedDateTime' in resource_properties['Patient']
@@ -57,5 +58,13 @@ def test_emitter(config_path, input_paths, output_path, pfb_path):
     results = inspect_pfb(pfb_path)
     assert len(results.errors) == 0, results.errors
     assert len(results.warnings) == 0, results.warnings
+
+    with open(f"{output_path}/pfb/Patient.ndjson") as fp:
+        patient = json.loads(fp.readline())
+        properties = patient['object']
+        assert properties['id']
+        assert properties['submitter_id']
+        assert properties['id'] != properties['submitter_id']
+        logger.info(f"check custom submitter id:{properties['id']} submitter_id:{properties['submitter_id']}")
 
     cleanup_emitter(output_path, pfb_path)

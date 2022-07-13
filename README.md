@@ -226,24 +226,6 @@ Brian Walsh - [@bpwalsh](https://twitter.com/bpwalsh) - walsbr AT ohsu DOT edu
 * [ncpi-fhir-pfb-prototype](https://github.com/NimbusInformatics/ncpi-fhir-pfb-prototype)
 * [gen3](https://github.com/uc-cdis/pypfb)
 
-## Roadmap
-
-  * ✅ config.yaml driven map of FHIR resource to PFB node, 
-  * ✅ Parse FHIR resources, retrieve and cache FHIR profile (schema) elements,
-  * ✅ Recursively match with FHIR profiles (schemas)
-  * ✅ Flatten for export
-  * ✅ write to PFB
-  * ✅ test cases for protected/ resources - ResearchSubject, Patient, Specimen, Task, DocumentReference
-  * ✅ networkx based visualization
-  * ✅ pfb cli
-  * ✅ demo with public data
-  * ✅ update README with Terra import examples
-  * ✅ update README with gen3 import examples
-  * ✅ update to new release of pypfb `0.5.18`
-  * ✅ include kids first
-  * ✅ simplify
-  * ✅ add genomic reporting [examples](http://hl7.org/fhir/uv/genomics-reporting/artifacts.html#example-example-instances)
-  * ✅ pypi
 
 ## Distribution
 
@@ -270,7 +252,3 @@ twine upload dist/*
 
 ```
 
-  
-## Known Issues
-  * `simplify` - could do a better job of making resulting nodes more "data frame friendly"
-  * `config.yaml` - currently there is no way of expressing a reference found in a FHIR extension.

@@ -5,7 +5,6 @@ from collections import OrderedDict
 import click
 import yaml
 
-from pfb_fhir.handlers import handler_factory
 from pfb_fhir.model import Model
 import logging
 import cProfile, pstats
@@ -37,13 +36,9 @@ class NaturalOrderGroup(click.Group):
 
 
 def initialize_model(config_path):
-    """Build the model and it's handlers."""
+    """Build the model."""
     model_ = Model.parse_file(config_path)
-
     model_.dependency_order = list(yaml.safe_load(open(config_path))['entities'])
-    # fetch child fhir profiles
-    model_.fetch_profiles()
-    [handler_factory(entity) for entity in model_.entities.values()]
     return model_
 
 

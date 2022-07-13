@@ -17,13 +17,13 @@ def test_model(config_path, input_ncpi_patient_paths):
     for file in input_ncpi_patient_paths:
         for context in process_files(model, file):
             assert context
-            for k in ['model', 'properties', 'resource', 'entity']:
+            for k in ['properties', 'resource']:
                 assert getattr(context, k), f"{k} was empty"
             properties = context.properties
             resource = context.resource
-            assert resource['id'] and resource['resourceType']
+            assert resource.id and resource.resource_type
             assert properties['id']
-            resource_properties[resource['resourceType']].update(properties.keys())
+            resource_properties[resource.resource_type].update(properties.keys())
 
     assert set(resource_properties['DocumentReference']) == {'content.0.attachment.url', 'context.related.0.reference', 'custodian.reference', 'id', 'meta.profile.0', 'resourceType', 'status', 'subject.reference', 'text.div', 'text.status'}
     expected_patient_key_sets = [
@@ -51,6 +51,13 @@ def test_emitter(config_path, input_ncpi_patient_paths, output_path, pfb_path):
     assert len(results.errors) == 0, results.errors
     assert len(results.warnings) == 0, results.warnings
 
+    with open(f"{output_path}/pfb/DocumentReference.ndjson") as fp:
+        patient = json.loads(fp.readline())
+        properties = patient['object']
+        assert properties['id']
+        assert properties['gh4gh_drs_uri']
+        assert properties['gh4gh_drs_uri'].startswith('drs')
+
     cleanup_emitter(output_path, pfb_path)
 
 
@@ -66,7 +73,8 @@ def test_patient_emitter(config_path, patient_input_path, output_path, pfb_path)
     assert 'Patient.yaml' in schema
     patient_schema = schema['Patient.yaml']
     properties_with_term_def = [k for k, p in patient_schema['properties'].items() if 'term' in p]
-    assert set(properties_with_term_def) == {'contact_0_relationship_0_coding_0_code', 'contact_1_address_use', 'contact_1_gender', 'address_0_use', 'gender', 'text_status', 'address_0_type', 'name_0_use', 'contact_0_address_use', 'contact_1_name_use', 'contact_0_address_type', 'contact_0_name_use', 'contact_0_telecom_0_system', 'contact_0_gender', 'contact_1_address_type', 'contact_1_telecom_0_use', 'contact_1_telecom_0_system', 'telecom_0_system', 'contact_0_telecom_0_use', 'telecom_0_use', 'contact_1_relationship_0_coding_0_code'}
+    print(properties_with_term_def)
+    assert set(properties_with_term_def) == set({})
 
     from pprint import pprint
     properties_with_term_def_but_no_enum = []
@@ -74,9 +82,6 @@ def test_patient_emitter(config_path, patient_input_path, output_path, pfb_path)
         if 'enum' not in patient_schema['properties'][k]:
             pprint(patient_schema['properties'][k])
             properties_with_term_def_but_no_enum.append(k)
-    assert set(properties_with_term_def_but_no_enum) == {
-        'contact_1_relationship_0_coding_0_code',
-        'contact_0_relationship_0_coding_0_code'
-    }
+    assert set(properties_with_term_def_but_no_enum) == set({})
 
     cleanup_emitter(output_path, pfb_path)

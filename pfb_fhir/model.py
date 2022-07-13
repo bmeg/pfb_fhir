@@ -1,16 +1,17 @@
 """Implements model, matches Entities to Profiles."""
 
+import collections
 import json
+import logging
 import os
 from copy import deepcopy
 from typing import Optional, Dict, Any, List, OrderedDict
-import collections
 
 import requests
+import yaml
+from fhirclient.models.resource import Resource
+from flatten_json import flatten
 from pydantic import BaseModel, PrivateAttr
-import logging
-
-from pfb_fhir.observable import Command, ObservableData, Context
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,12 @@ class Constant(Element):
     value: str
 
 
-class Entity(Element, Command):
+class SubmitterIdAlias(BaseModel):
+    """Property constant."""
+    identifier_system: str
+
+
+class Entity(Element):
     """A FHIR resource, or embedded profile."""
 
     category: str
@@ -145,110 +151,24 @@ class Entity(Element, Command):
     """Narrow the scope of links."""
     source: Optional[str]
     """Explicit url for the profile."""
-    _profile: dict = PrivateAttr()
-    """Actual profile."""
-    _handler: Any = PrivateAttr()
-    """Method that processes this entity. TODO - should be callable?"""
-    # TODO should be callable?
-    _element_lookup: Dict[str, dict] = PrivateAttr()
+    submitter_id: Optional[SubmitterIdAlias] = None
+    """Alias for submitter_id."""
 
-    def __init__(self, **data):
-        """Retrieve the fhir schema for this entity, make schema searchable."""
-        super().__init__(**data)
-        self._profile = fhir_profile_retriever.get_profile(self.id, self.source)
-        self._ensure_element_lookup()
 
-    @property
-    def profile(self):
-        """Getter."""
-        return self._profile
+class AttributeEnum(BaseModel):
+    """Information about an enumeration."""
 
-    @property
-    def handler(self):
-        """Getter."""
-        return self._handler
+    url: str
+    """Value/Code set url."""
 
-    @property
-    def element_lookup(self):
-        """Getter."""
-        return self._element_lookup
+    restricted_to: List[str]
+    """Enumerated values."""
 
-    # doesn't work see https://github.com/samuelcolvin/pydantic/issues/1577#issuecomment-790506164
-    # @property.setter
-    # def handler(self, handler):
-    #     self._handler = handler
-    # TODO - for now, java style setter
-    def set_handler(self, handler):
-        """Setter."""
-        self._handler = handler
+    binding_strength: str
+    """FHIR binding strength, how should this enumeration be validated?"""
 
-    def notify(self, observable: ObservableData, context: Context = None, *args, **kwargs) -> None:
-        """Delegate to handler."""
-        self._handler(entity=self, observable=observable, context=context, *args, **kwargs)
-
-    def interested(self, observable: ObservableData) -> bool:
-        """Return True if data matches our profile."""
-        if isinstance(observable.payload, dict):
-            return self.id == observable.payload.get('resourceType', None)
-
-        if isinstance(observable.payload, Property):
-            starting_element = observable.payload.root_element
-            if len(observable.payload.leaf_elements) > 0:
-                starting_element = observable.payload.leaf_elements[-1]
-            for observable_type in starting_element['type']:
-                if not isinstance(observable_type, dict):
-                    Exception('?')
-                if observable_type.get('code', None) == self.id:
-                    return True
-                if observable_type.get('code', None) in FHIR_TYPES:
-                    json_type = FHIR_TYPES[observable_type['code']].json_type
-                    return json_type == self.id
-
-        else:
-            assert False, (observable.payload.__class__.__name__, observable.payload.parent_definition['type'], self.id)
-
-    def fetch_profile(self):
-        """Fetch FHIR sub profiles."""
-        for profile in fhir_profile_retriever.fetch_all(self._profile):
-            yield profile
-
-    def _ensure_element_lookup(self):
-        """Add lookup dict of properties and expand value[x].
-
-        see https://build.fhir.org/formats.html#choice
-        """
-
-        def _camel_case(code_: str) -> str:
-            """Return entity type from code."""
-            if code_.lower() == 'datetime':
-                return 'DateTime'
-            if code_.lower() == 'codeableconcept':
-                return 'CodeableConcept'
-            return code_.title()
-
-        elements = {element['id']: element for element in self._profile['snapshot']['element']}
-        new_elements = {}
-        to_delete = []
-        for id_, element in elements.items():
-            if '[x]' in id_:
-                base = id_.replace('[x]', '')
-                for type_ in element['type']:
-                    code = type_['code']
-                    if code is None:
-                        print("?")
-                    new_element = deepcopy(element)
-                    new_element['id'] = f"{base}{_camel_case(code)}"
-                    new_element['type'] = [type_]
-                    new_elements[new_element['id']] = new_element
-                to_delete.append(id_)
-        if len(to_delete) > 0:
-            # logger.info(f"Removing {to_delete}")
-            for id_ in to_delete:
-                elements.pop(id_)
-            # logger.info(f"Adding {new_elements.keys()}")
-            elements = elements | new_elements
-
-        self._element_lookup = elements
+    class_name: str
+    """FHIR class name."""
 
 
 class Property(BaseModel):
@@ -256,53 +176,55 @@ class Property(BaseModel):
 
     flattened_key: str
     """The key in a flattened representation."""
-    simple_key: str
-    """The simple key direct from parent's point of view."""
-    root_element: dict
-    """The fhir profile of the root."""
-    leaf_elements: Optional[List[dict]] = []
-    """The fhir profile of the leaf."""
+    docstring: Optional[str]
+    """FHIR documentation for the element."""
+    enum: Optional[AttributeEnum]
+    """Information about the Value/Code set."""
+    name: str
+    """The FHIR attribute name (possibly renamed for python compatibility)."""
+    jsname: str
+    """The FHIR attribute name in JSON."""
+    typ: str
+    """The FHIR type."""
+    is_list: bool
+    """List of FHIR resources?"""
+    of_many: Optional[str]
+    """A value[x]?"""
+    not_optional: bool
+    """Required."""
+
     value: Any
     """The value."""
-    complete: bool = False
-    """Have we discovered schema profiles"""
 
 
-class ObservableProperty(ObservableData):
-    """Overrides payload type."""
-
-    payload: Property
-    """A property in a resource"""
-
-
-class Model(Command):
+class Model(BaseModel):
     """Delegates to a collection of Entity."""
 
     entities: Optional[OrderedDict[str, Entity]] = collections.OrderedDict()
     dependency_order: Optional[List[str]] = []
 
-    def notify(self, observable: ObservableData, context: Context = None, *args, **kwargs) -> None:
-        """NO-OP, entities process the data."""
-        pass
+    @staticmethod
+    def parse_file(path: str) -> Any:
+        """Use entity_name, the map key  as id."""
+        with open(path) as fp:
+            config = yaml.safe_load(fp)
 
-    def interested(self, observable: ObservableData) -> bool:
-        """Delegate to entities."""
-        return any(entity.interested(observable) for entity in self.entities)
+        needs_adding = []
+        for entity_name, entity in config['entities'].items():
+            if 'id' not in entity:
+                entity['id'] = entity_name
+            if 'links' in entity:
+                assert isinstance(entity['links'], dict), f"Error parsing file {path} unexpected link type for {entity_name} {entity['links']}"
+                for link_name, link in entity['links'].items():
+                    if 'id' not in link:
+                        link['id'] = link_name
+            if entity['id'] not in config['entities']:
+                needs_adding.append(entity)
+        # add entities that not are sub-typed
+        for entity in needs_adding:
+            config['entities'][entity['id']] = entity
 
-    def observe(self, observable):
-        """Register self with data if interested.
-
-        :type observable: ObservableData|list
-        """
-        assert observable
-        observable_list = observable
-        if not isinstance(observable, list):
-            observable_list = [observable]
-        for observable_ in observable_list:
-            for entity in self.entities.values():
-                if entity.interested(observable_):
-                    observable_.register_observer(entity)
-        return observable
+        return Model.parse_obj(config)
 
     def fetch_profiles(self):
         """Ask entities to recursively fetch their FHIR profiles, add Entities to model."""
@@ -316,23 +238,100 @@ class Model(Command):
             self.entities[entity.id] = entity
 
 
+class Context(BaseModel):
+    """Transient data for command(s)."""
+
+    obj: dict = {}
+
+
 class TransformerContext(Context):
     """Typed context."""
+    class Config:
+        arbitrary_types_allowed = True
 
-    model: Model
-    """A collection of Entity."""
+    resource: Optional[Resource]
+    """Source FHIR object."""
 
-    resource: Optional[ObservableData]
-    """Source object with entity and handlers."""
-
-    properties: Optional[List[Property]]
+    properties: Optional[Dict[str, Property]] = {}
     """A list of transformed properties"""
+
+    simplify: Optional[bool] = False
+    """Flag, if set, remove FHIR scaffolding"""
 
     entity: Optional[Entity]
     """Model Entity associated with transformer."""
 
-    simplify: Optional[bool] = False
-    """Flag, if set, remove FHIR scaffolding"""
+    def __init__(self, **data):
+        """Runs transform after init."""
+        super().__init__(**data)
+        self.transform()
+
+    def transform(self):
+        """Creates properties."""
+        if self.simplify:
+            js, _ = self.resource.as_simplified_json()
+        else:
+            js = self.resource.as_json(strict=False)
+
+        assert 'resourceType' in js, "Should have resourceType"
+        js['resource_type'] = js['resourceType']
+
+        flattened = flatten(js, separator='.')
+
+        for flattened_key, value in flattened.items():
+            resource_ = self.resource
+
+            enum_ = None
+
+            found = False
+            for flattened_key_part in flattened_key.split('.'):
+                if flattened_key_part.isnumeric():
+                    # traverse over list index
+                    continue
+                for name, jsname, typ, is_list, of_many, not_optional in resource_.elementProperties() + [
+                        ("resource_type", "resource_type", str, False, None, False)]:
+                    if flattened_key_part == name:
+                        found = True
+                        docstring = resource_.attribute_docstrings().get(name)
+
+                        if resource_.attribute_enums().get(name):
+                            enum_ = resource_.attribute_enums().get(name)
+
+                        if hasattr(getattr(resource_, name), 'attribute_docstrings'):
+                            resource_ = getattr(resource_, name)
+
+                        if flattened_key == 'resource_type':
+                            flattened_key = 'resourceType'
+                        apply_enum = enum_ if name == 'code' else None
+
+                        self.properties[flattened_key] = Property(
+                                flattened_key=flattened_key,
+                                value=value,
+                                docstring=docstring,
+                                enum=apply_enum,
+                                name=name,
+                                jsname=jsname,
+                                typ=value.__class__.__name__,
+                                is_list=is_list,
+                                of_many=of_many,
+                                not_optional=not_optional
+                            )
+
+                        break
+
+            if not found:
+                self.properties[flattened_key] = Property(
+                    flattened_key=flattened_key,
+                    value=value,
+                    docstring='extension',
+                    enum=None,
+                    name='extension',
+                    jsname='extension',
+                    typ=value.__class__.__name__,
+                    is_list=True,
+                    of_many=None,
+                    not_optional=False
+                )
 
 
 class EdgeSummary(BaseModel):

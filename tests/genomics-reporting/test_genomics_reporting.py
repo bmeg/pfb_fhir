@@ -17,13 +17,13 @@ def test_model(config_path, input_paths):
     for file in input_paths:
         for context in process_files(model, file, simplify=False):
             assert context
-            for k in ['model', 'properties', 'resource', 'entity']:
+            for k in ['properties', 'resource', 'entity']:
                 assert getattr(context, k), f"{k} was empty"
             properties = context.properties
             resource = context.resource
-            assert resource['id'] and resource['resourceType']
+            assert resource.id and resource.resource_type
             assert properties['id']
-            resource_properties[resource['resourceType']].update(properties.keys())
+            resource_properties[resource.resource_type].update(properties.keys())
 
     from pprint import pprint
     pprint(resource_properties)

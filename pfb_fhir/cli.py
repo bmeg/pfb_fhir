@@ -1,26 +1,24 @@
 """Implements command line."""
 
 import glob
+import importlib
 import json
+import logging
 import os
-from typing import Iterator
 from pathlib import Path
+from typing import Iterator, Iterable
 
 import click
-import logging
-import networkx as nx
-
-from click_loglevel import LogLevel
-from importlib_metadata import distribution
 import matplotlib.pyplot as plt
-
+import networkx as nx
+from click_loglevel import LogLevel
+from fhirclient.models.domainresource import DomainResource
+from importlib_metadata import distribution
 
 from pfb_fhir import NaturalOrderGroup, DEFAULT_OUTPUT_PATH, DEFAULT_CONFIG_PATH, initialize_model, run_cmd
+from pfb_fhir.emitter import inspect_pfb
 from pfb_fhir.emitter import pfb
 from pfb_fhir.model import TransformerContext
-from pfb_fhir.observable import ObservableData
-from pfb_fhir.emitter import inspect_pfb
-from pfb_fhir.context_simplifier import ContextSimplifier
 
 LOG_FORMAT = '%(asctime)s %(name)s %(levelname)-8s %(message)s'
 logger = logging.getLogger(__name__)
@@ -59,8 +57,9 @@ def version():
 @click.option('--input_path',  multiple=True, help='FHIR resources paths.')
 @click.option('--pfb_path', help='Location to write PFB.')
 @click.option('--simplify', is_flag=True, show_default=True, default=False, help="Remove FHIR scaffolding, make data frame friendly.")
+@click.option('--strict', is_flag=True, show_default=True, default=False, help="Stop on any FHIR validation error.")
 @click.pass_context
-def transform(ctx, input_path, pfb_path, simplify):
+def transform(ctx, input_path, pfb_path, simplify, strict):
     """Transform FHIR resources from directory."""
     model = ctx.obj['model']
     if not model:
@@ -68,7 +67,7 @@ def transform(ctx, input_path, pfb_path, simplify):
         return
 
     with pfb(ctx.obj['output_path'], pfb_path, model) as pfb_:
-        for context in process_files(model, input_path, simplify=simplify):
+        for context in process_files(model, input_path, simplify=simplify, strict=strict):
             pfb_.emit(context)
 
 
@@ -141,28 +140,47 @@ def visualize(ctx, pfb_path, layout):
 
 
 def _sniff(file_path) -> Iterator[dict]:
-    """Sniff json or ndjson, yield row."""
+    """Sniff json or ndjson, yield json raw dictionary."""
     with open(file_path, "r") as fhir_resource_file:
         try:
+            # see if this file, in its entirety is json
             fhir_resources = json.load(fhir_resource_file)
             if isinstance(fhir_resources, dict) and 'entry' in fhir_resources:
+                # this looks like a bundle
                 for entry in fhir_resources['entry']:
                     yield entry['resource']
                 return
-
             if isinstance(fhir_resources, dict):
+                # it's a single dict
                 yield fhir_resources
                 return
             for fhir_resource in fhir_resources:
+                # it's a list
                 yield fhir_resource
                 return
         except json.decoder.JSONDecodeError:
+            # re-try,  assume this is ndjson
             fhir_resource_file.seek(0)
             for line in fhir_resource_file:
                 yield json.loads(line)
 
 
-def process_files(model, input_paths, simplify=False) -> Iterator[TransformerContext]:
+def read_resources(file_path: str, strict=True) -> Iterable[DomainResource]:
+    """Read a json payload from path, marshall into fhirclient.models FHIR resource."""
+    for resource_dict in _sniff(file_path):
+        # dynamically import model
+        assert 'resourceType' in resource_dict
+        resource_type = resource_dict['resourceType']
+        module_name = f"fhirclient.models.{resource_type.lower()}"
+        module = importlib.import_module(module_name)
+        assert module
+        clazz = getattr(module, resource_type)
+        assert clazz
+        # create instance
+        yield clazz(resource_dict, strict=strict)
+
+
+def process_files(model, input_paths, simplify=False, strict=True) -> Iterator[TransformerContext]:
     """Set up context and stream files into the model."""
     # handle either file or path pattern
     if not isinstance(input_paths, (list, tuple, )):
@@ -176,15 +194,10 @@ def process_files(model, input_paths, simplify=False) -> Iterator[TransformerCon
         # process the data
         for file in files:
             logger.info(file)
-            for json_ in _sniff(file):
-                # copy the model into the observer context
-                context = TransformerContext(model=model, simplify=simplify)
-                model.observe(
-                    ObservableData(payload=json_)) \
-                    .assert_observers() \
-                    .notify_observers(context=context)
-                if simplify:
-                    context = ContextSimplifier.simplify(context)
+            for resource in read_resources(file, strict=strict):
+                assert isinstance(resource,
+                                  DomainResource), f"Error reading {file}. Should be DomainResource, was {resource.__class__}"
+                context = TransformerContext(resource=resource, simplify=simplify, entity=model.entities[resource.resource_type])
                 yield context
 
 
@@ -421,7 +434,7 @@ def kf(ctx):
 
 @demo.command()
 @click.pass_context
-def genomic_reporting(ctx):
+def genomics_reporting(ctx):
     """Read oncology example from ImplementationGuide."""
     show = ctx.obj['show']
     dry_run = ctx.obj['dry_run']
