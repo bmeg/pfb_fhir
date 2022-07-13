@@ -52,7 +52,8 @@ class Emitter(BaseModel, abc.ABC):
 
     def close(self) -> None:
         """Close any open files."""
-        for file in self.open_files.values():
+
+        for file_path, file in self.open_files.items():
             file.close()
 
     @abc.abstractmethod
@@ -135,77 +136,57 @@ class DictionaryEmitter(Emitter):
             yield property_name
 
         for property_ in context.properties.values():
-            if property_.root_element.get('min', -1) > 0:
+            if property_.not_optional:
                 yield property_.flattened_key
 
     def render_property(self, context) -> tuple[str, dict]:
         """Render the property type and description."""
         for property_ in context.properties.values():
-            element = property_.root_element
-            if property_.leaf_elements:
-                element = property_.leaf_elements[-1]
-            required = property_.root_element.get('min', -1) > 0
-
-            assert 'type' in element, f"no type? {element}"
-
-            type_codes = [DictionaryEmitter.normalize_type(type_['code'], property_) for type_ in element['type']]
+            required = property_.not_optional
+            type_codes = [DictionaryEmitter.normalize_type(property_.typ, property_)]
             if not required:
                 type_codes.append('null')
 
             schema_property = {
                     'type': type_codes, 'description': '. '.join(DictionaryEmitter.description(property_))
                 }
-            term_def = None
-            for type_ in element['type']:
-                code = type_['code']
-                term_def = DictionaryEmitter.get_term_def(code, property_)
-                if term_def:
-                    break
-            if term_def:
-                description = '. '.join(DictionaryEmitter.description(property_) + [term_def['term_url']])
+
+            if property_.enum:
+                description = '. '.join(DictionaryEmitter.description(property_) + [property_.enum.url])
+                term_def = DictionaryEmitter.get_term_def(property_)
                 schema_property = {
                     'type': type_codes,
                     'description': description,
                     'term': {'termDef': term_def, 'description': description}
                 }
                 # add enum
-                enum_codes = self._value_sets.codes(term_def['term_url'])
-                if enum_codes and term_def['strength'] in ['required', 'preferred']:
+                enum_codes = property_.enum.restricted_to
+                if enum_codes and property_.enum.binding_strength in ['required', 'preferred']:
                     del schema_property['type']
                     schema_property['enum'] = enum_codes
                 elif enum_codes:
                     schema_property['description'] = schema_property['description'] + ' ' + '|'.join(enum_codes)
                     schema_property['term']['description'] = schema_property['description']
                 else:
-                    logger.debug(f"No enumeration found for: {property_.flattened_key} {term_def['term_url']}")
+                    logger.debug(f"No enumeration found for: {property_.flattened_key} {property_.enum.url}")
 
             yield property_.flattened_key.replace('.', '_'), schema_property
 
     @staticmethod
-    def get_term_def(code, property_) -> str:
+    def get_term_def(property_) -> str:
         """Cast to json schema types."""
-        term_def = None
-        if code in ['code', 'Code']:
-            for element in reversed(property_.leaf_elements):
-                value_set = element.get('binding', {}).get('valueSet', None)
-                if value_set:
-                    value_set_version = None
-                    if '|' in value_set:
-                        value_set_version = value_set.split('|')[-1]
-                    value_set_id = value_set.split('|')[0].split('/')[-1]
-                    strength = 'required'
-                    for element_ in reversed(property_.leaf_elements):
-                        if 'binding' in element_:
-                            strength = element_['binding'].get('strength', None)
-                    term_def = {
-                        'term': value_set_id,
-                        'source': 'fhir',
-                        'cde_id': value_set_id,
-                        'cde_version': value_set_version,
-                        'term_url': value_set,
-                        'strength': strength
-                    }
-                    break
+        value_set_id = property_.enum.url
+        value_set_version = None
+        if '|' in property_.enum.url:
+            value_set_version = value_set_id.split('|')[-1]
+        term_def = {
+            'term': value_set_id,
+            'source': 'fhir',
+            'cde_id': value_set_id,
+            'cde_version': value_set_version,
+            'term_url': value_set_id,
+            'strength': property_.enum.binding_strength
+        }
         return term_def
 
     @staticmethod
@@ -214,11 +195,11 @@ class DictionaryEmitter(Emitter):
         if code in FHIR_TYPES:
             return FHIR_TYPES[code].json_type
         if code in ['code', 'uri', 'url', 'canonical', 'xhtml', 'date', 'instant', 'id', 'markdown', 'base64Binary',
-                    'string', 'dateTime', 'String', 'Code', 'DateTime']:
+                    'string', 'dateTime', 'String', 'Code', 'DateTime', 'str']:
             return 'string'
-        if code in ['decimal', 'positiveInt', 'integer', 'Decimal', 'Integer']:
+        if code in ['decimal', 'positiveInt', 'integer', 'Decimal', 'Integer', 'int', 'float']:
             return "number"
-        if code in ['boolean', 'Boolean']:
+        if code in ['boolean', 'Boolean', 'bool']:
             return 'boolean'
         if first_occurrence(f"No mapping for {code} default to string"):
             logger.warning(f"No mapping for {code} default to string")
@@ -227,17 +208,21 @@ class DictionaryEmitter(Emitter):
     @staticmethod
     def description(property_) -> List[str]:
         """Concatenates descriptions (utility)."""
-        descriptions = []
-        # add short description of ancestors
-        for leaf_element in property_.leaf_elements[:-1]:
-            if leaf_element['short'] not in descriptions:
-                descriptions.append(leaf_element['short'])
-        # add long description of leaf
-        leaf_element = property_.leaf_elements[-1]
-        if leaf_element['short'] not in descriptions:
-            descriptions.append(leaf_element.get('definition', leaf_element['short']))
-
-        return descriptions
+        # descriptions = []
+        # # add short description of ancestors
+        # for leaf_element in property_.leaf_elements[:-1]:
+        #     if leaf_element['short'] not in descriptions:
+        #         descriptions.append(leaf_element['short'])
+        # # add long description of leaf
+        # leaf_element = property_.leaf_elements[-1]
+        # if leaf_element['short'] not in descriptions:
+        #     descriptions.append(leaf_element.get('definition', leaf_element['short']))
+        #
+        # return descriptions
+        # TODO - should we concatenate hierarchy of doc strings?
+        if property_.docstring:
+            return [property_.docstring]
+        return ['']
 
 
 class IdentifierAlias(BaseModel):
@@ -282,7 +267,7 @@ class PFBJsonEmitter(Emitter):
 
     def emit(self, context: TransformerContext) -> bool:
         """Ensure file open, write row."""
-        path = f'{self.work_dir}/{context.entity.id}.ndjson'
+        path = f'{self.work_dir}/{context.resource.resource_type}.ndjson'
         if path not in self.open_files:
             self.open_files[path] = open(path, "w")
         pfb_dict = self.render_json(context)
@@ -295,13 +280,21 @@ class PFBJsonEmitter(Emitter):
         """Create links, add submitter_id and other PFB dependencies."""
         links = []
         for link_key, link in context.entity.links.items():
-            if link_key not in context.resource and link.required:
-                if first_occurrence(f"Could not find {link_key} in {context.resource['resourceType']}"):
-                    logger.warning(f"Could not find {link_key} in {context.resource['resourceType']}.{context.resource['id']}")
-            if link_key in context.resource:
-                references = context.resource[link_key]
-                if not isinstance(context.resource[link_key], list):
-                    references = [context.resource[link_key]]
+            if not hasattr(context.resource, link_key):
+                msg = f"{context.resource.resource_type}.{link_key} not found, attempting to add _fhir suffix."
+                if first_occurrence(msg):
+                    logger.warning(msg)
+                link_key += '_fhir'
+            if not hasattr(context.resource, link_key):
+                logger.warning(f"{context.resource.resource_type}.{link_key}' not found in {[p[0] for p in context.resource.elementProperties()]}")
+                continue
+            if not getattr(context.resource, link_key) and link.required:
+                if first_occurrence(f"Could not find {link_key} in {context.resource.resource_type}"):
+                    logger.warning(f"Could not find {link_key} in {context.resource.resource_type}.{context.resource.id}")
+            if getattr(context.resource, link_key):
+                references = getattr(context.resource, link_key)
+                if not isinstance(references, list):
+                    references = [references]
                 for reference in references:
                     reference_parts = self._link_submitter_id(reference)
                     if reference_parts['resource_type'] is None:
@@ -321,20 +314,20 @@ class PFBJsonEmitter(Emitter):
 
         # submitter_id from context.entity
         if context.entity.submitter_id:
-            for identifier in context.resource['identifier']:
-                if identifier['system'] == context.entity.submitter_id.identifier_system:
-                    flattened['submitter_id'] = identifier['value']
+            for identifier in context.resource.identifier:
+                if identifier.system == context.entity.submitter_id.identifier_system:
+                    flattened['submitter_id'] = identifier.value
         else:
-            flattened['submitter_id'] = context.resource['id']
+            flattened['submitter_id'] = context.resource.id
 
         # gh4gh_drs_uri from context.entity
-        if context.resource['resourceType'] == 'DocumentReference':
+        if context.resource.resource_type == 'DocumentReference':
             flattened['gh4gh_drs_uri'] = None
-            if 'content' in context.resource:
-                for content in context.resource['content']:
-                    if 'attachment' in content:
-                        attachment = content['attachment']
-                        url = attachment.get('url', None)
+            if context.resource.content:
+                for content in context.resource.content:
+                    if content.attachment:
+                        attachment = content.attachment
+                        url = attachment.url
                         if url and url.startswith('drs'):
                             flattened['gh4gh_drs_uri'] = url
         #
@@ -353,25 +346,25 @@ class PFBJsonEmitter(Emitter):
 
     def _link_submitter_id(self, fhir_reference):
         """Transform to PFB friendly submitter id, in this sense submitter_id is the id used in the link, not the submitter_id in the resource."""
-        if 'reference' in fhir_reference:
-            if '?identifier' in fhir_reference['reference']:
-                resource_type = fhir_reference['reference'].split('?')[0]
-                submitter_id = fhir_reference['reference'].split('|')[-1]
+        if hasattr(fhir_reference, 'reference') and fhir_reference.reference:
+            if '?identifier' in fhir_reference.reference:
+                resource_type = fhir_reference.reference.split('?')[0]
+                submitter_id = fhir_reference.reference.split('|')[-1]
                 return {'submitter_id': submitter_id, 'resource_type': resource_type}
             else:
-                reference_parts = fhir_reference['reference'].split('/')
+                reference_parts = fhir_reference.reference.split('/')
                 return {'submitter_id': reference_parts[-1], 'resource_type': reference_parts[0]}
-        if 'valueReference' in fhir_reference:
-            reference_parts = fhir_reference['valueReference']['reference'].split('/')
+        if hasattr(fhir_reference, 'valueReference') and fhir_reference.valueReference:
+            reference_parts = fhir_reference.valueReference.reference.split('/')
             return {'submitter_id': reference_parts[-1], 'resource_type': reference_parts[0]}
-        if 'identifier' in fhir_reference:
+        if hasattr(fhir_reference, 'identifier'):
             # see https://build.fhir.org/references.html#logical
             # {
             #   'display': 'HEALTHALLIANCE HOSPITALS, INC',
             #   'identifier': {'system': 'https://github.com/synthetichealth/synthea', 'value': 'ef58ea08-d883-3957-8300-150554edc8fb'}
             # }
-            if 'http' in fhir_reference['identifier']['system']:
-                key = f"{fhir_reference['identifier']['system']}/{fhir_reference['identifier']['value']}"
+            if 'http' in fhir_reference.identifier.system:
+                key = f"{fhir_reference.identifier.system}/{fhir_reference.identifier.value}"
                 assert key in self.aliases, f"{key} not seen"
                 alias = self.aliases[key]
                 return {
@@ -427,11 +420,18 @@ def pfb(work_dir: str, file_path: str, model: Model) -> Iterator[PFB]:
     # create emitters
     pfb_json_emitter = PFBJsonEmitter(work_dir=work_dir)
     data_dictionary_emitter = DictionaryEmitter(work_dir=work_dir)
+    ok = False
     pfb_ = PFB(emitters=[pfb_json_emitter, data_dictionary_emitter], file_path=file_path, model=model)
     try:
         # return to caller
         yield pfb_
+        ok = True
+    except Exception as ex:
+        logger.exception(ex)
+        raise ex
     finally:
+        if not ok:
+            return
         # tell emitters to close
         pfb_.close()
         # ask gen3 to create a single dump file. See WORK_FILES
@@ -541,7 +541,7 @@ def inspect_pfb(file_name) -> InspectionResults:
     results.info.append(f"'Records with relationships': {len(with_relations)}")
     results.info.append(f"'Records': {len(records)}")
 
-    assert len(records) > 1, "Should have more than just metadata"
+    assert len(records) > 1, f"Should have more than just metadata {file_name}"
     if len(with_relations) == 0:
         results.warnings.append("No records have relationships.")
 

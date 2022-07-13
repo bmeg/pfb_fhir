@@ -14,15 +14,15 @@ def test_model(config_path, input_paths, expected_results):
     resource_properties = defaultdict(set)
 
     for file in input_paths:
-        for context in process_files(model, file):
+        for context in process_files(model, file, strict=False):
             assert context
-            for k in ['model', 'properties', 'resource', 'entity']:
+            for k in ['properties', 'resource', 'entity']:
                 assert getattr(context, k), f"{k} was empty"
             properties = context.properties
             resource = context.resource
-            assert resource['id'] and resource['resourceType']
+            assert resource.id and resource.resource_type
             assert properties['id']
-            resource_properties[resource['resourceType']].update(properties.keys())
+            resource_properties[resource.resource_type].update(properties.keys())
 
     for key in expected_results:
         assert expected_results[key] == resource_properties[key]
@@ -33,7 +33,7 @@ def test_emitter(config_path, input_paths, output_path, pfb_path):
     model = initialize_model(config_path)
 
     with pfb(output_path, pfb_path, model) as pfb_:
-        for context in process_files(model, input_paths):
+        for context in process_files(model, input_paths, strict=False):
             pfb_.emit(context)
 
     assert os.path.isfile(pfb_path)

@@ -1,15 +1,18 @@
 """Implements model, matches Entities to Profiles."""
 
+import collections
 import json
+import logging
 import os
 from copy import deepcopy
-from typing import Optional, Dict, Any, List, OrderedDict, Union
-import collections
+from typing import Optional, Dict, Any, List, OrderedDict
 
 import requests
 import yaml
+from fhirclient.models.fhirabstractbase import FHIRAbstractBase
+from fhirclient.models.resource import Resource
+from flatten_json import flatten
 from pydantic import BaseModel, PrivateAttr
-import logging
 
 from pfb_fhir.observable import Command, ObservableData, Context
 
@@ -242,8 +245,6 @@ class Entity(Element, Command):
                 base = id_.replace('[x]', '')
                 for type_ in element['type']:
                     code = type_['code']
-                    if code is None:
-                        print("?")
                     new_element = deepcopy(element)
                     new_element['id'] = f"{base}{_camel_case(code)}"
                     new_element['type'] = [type_]
@@ -259,21 +260,46 @@ class Entity(Element, Command):
         self._element_lookup = elements
 
 
+class AttributeEnum(BaseModel):
+    """Information about an enumeration."""
+
+    url: str
+    """Value/Code set url."""
+
+    restricted_to: List[str]
+    """Enumerated values."""
+
+    binding_strength: str
+    """FHIR binding strength, how should this enumeration be validated?"""
+
+    class_name: str
+    """FHIR class name."""
+
+
 class Property(BaseModel):
     """Resource.property and it's FHIR definition."""
 
     flattened_key: str
     """The key in a flattened representation."""
-    simple_key: str
-    """The simple key direct from parent's point of view."""
-    root_element: dict
-    """The fhir profile of the root."""
-    leaf_elements: Optional[List[dict]] = []
-    """The fhir profile of the leaf."""
+    docstring: Optional[str]
+    """FHIR documentation for the element."""
+    enum: Optional[AttributeEnum]
+    """Information about the Value/Code set."""
+    name: str
+    """The FHIR attribute name (possibly renamed for python compatibility)."""
+    jsname: str
+    """The FHIR attribute name in JSON."""
+    typ: str
+    """The FHIR type."""
+    is_list: bool
+    """List of FHIR resources?"""
+    of_many: Optional[str]
+    """A value[x]?"""
+    not_optional: bool
+    """Required."""
+
     value: Any
     """The value."""
-    complete: bool = False
-    """Have we discovered schema profiles"""
 
 
 class ObservableProperty(ObservableData):
@@ -295,6 +321,7 @@ class Model(Command):
         with open(path) as fp:
             config = yaml.safe_load(fp)
 
+        needs_adding = []
         for entity_name, entity in config['entities'].items():
             if 'id' not in entity:
                 entity['id'] = entity_name
@@ -303,6 +330,11 @@ class Model(Command):
                 for link_name, link in entity['links'].items():
                     if 'id' not in link:
                         link['id'] = link_name
+            if entity['id'] not in config['entities']:
+                needs_adding.append(entity)
+        # add entities that not are sub-typed
+        for entity in needs_adding:
+            config['entities'][entity['id']] = entity
 
         return Model.parse_obj(config)
 
@@ -343,22 +375,92 @@ class Model(Command):
 
 class TransformerContext(Context):
     """Typed context."""
+    class Config:
+        arbitrary_types_allowed = True
 
-    model: Model
-    """A collection of Entity."""
+    resource: Optional[Resource]
+    """Source FHIR object."""
 
-    resource: Optional[ObservableData]
-    """Source object with entity and handlers."""
-
-    properties: Optional[List[Property]]
+    properties: Optional[Dict[str, Property]] = {}
     """A list of transformed properties"""
-
-    entity: Optional[Entity]
-    """Model Entity associated with transformer."""
 
     simplify: Optional[bool] = False
     """Flag, if set, remove FHIR scaffolding"""
 
+    entity: Optional[Entity]
+    """Model Entity associated with transformer."""
+
+    def __init__(self, **data):
+        """Runs transform after init."""
+        super().__init__(**data)
+        self.transform()
+
+    def transform(self):
+        """Creates properties."""
+        if self.simplify:
+            js, _ = self.resource.as_simplified_json()
+        else:
+            js = self.resource.as_json(strict=False)
+
+        assert 'resourceType' in js, "Should have resourceType"
+        js['resource_type'] = js['resourceType']
+
+        flattened = flatten(js, separator='.')
+
+        for flattened_key, value in flattened.items():
+            resource_ = self.resource
+
+            enum_ = None
+
+            found = False
+            for flattened_key_part in flattened_key.split('.'):
+                if flattened_key_part.isnumeric():
+                    # traverse over list index
+                    continue
+                for name, jsname, typ, is_list, of_many, not_optional in resource_.elementProperties() + [
+                        ("resource_type", "resource_type", str, False, None, False)]:
+                    if flattened_key_part == name:
+                        found = True
+                        docstring = resource_.attribute_docstrings().get(name)
+
+                        if resource_.attribute_enums().get(name):
+                            enum_ = resource_.attribute_enums().get(name)
+
+                        if hasattr(getattr(resource_, name), 'attribute_docstrings'):
+                            resource_ = getattr(resource_, name)
+
+                        if flattened_key == 'resource_type':
+                            flattened_key = 'resourceType'
+                        apply_enum = enum_ if name == 'code' else None
+
+                        self.properties[flattened_key] = Property(
+                                flattened_key=flattened_key,
+                                value=value,
+                                docstring=docstring,
+                                enum=apply_enum,
+                                name=name,
+                                jsname=jsname,
+                                typ=value.__class__.__name__,
+                                is_list=is_list,
+                                of_many=of_many,
+                                not_optional=not_optional
+                            )
+
+                        break
+
+            if not found:
+                self.properties[flattened_key] = Property(
+                    flattened_key=flattened_key,
+                    value=value,
+                    docstring='extension',
+                    enum=None,
+                    name='extension',
+                    jsname='extension',
+                    typ=value.__class__.__name__,
+                    is_list=True,
+                    of_many=None,
+                    not_optional=False
+                )
 
 class EdgeSummary(BaseModel):
     """Summary of edge in PFB."""

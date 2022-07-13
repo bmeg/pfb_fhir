@@ -22,13 +22,13 @@ def test_model(config_path):
             assert context
             if not context.properties:
                 continue
-            for k in ['model', 'properties', 'resource', 'entity']:
+            for k in ['properties', 'resource', 'entity']:
                 assert getattr(context, k, None), f"{k} was empty"
             properties = context.properties
             resource = context.resource
-            assert resource['id'] and resource['resourceType']
+            assert resource.id and resource.resource_type
             assert properties['id']
-            resource_properties[resource['resourceType']].update(properties.keys())
+            resource_properties[resource.resource_type].update(properties.keys())
 
     assert 'multipleBirthBoolean' in resource_properties['Patient']
     assert 'deceasedDateTime' in resource_properties['Patient']

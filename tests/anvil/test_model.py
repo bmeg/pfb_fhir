@@ -15,7 +15,7 @@ def test_model_setup(config_path):
     """Test all expected entities."""
     model = initialize_model(config_path)
     assert ",".join(sorted(entity.id for entity in
-                           model.entities.values())) == 'Address,Age,Annotation,Attachment,BackboneElement,CodeableConcept,Coding,ContactDetail,ContactPoint,Contributor,Count,DataRequirement,Distance,DocumentReference,Dosage,Duration,Expression,Extension,FamilyRelationship,HumanName,Identifier,Meta,Money,Narrative,Observation,Organization,ParameterDefinition,Patient,Period,Practitioner,PractitionerRole,Quantity,Questionnaire,QuestionnaireResponse,Range,Ratio,Reference,RelatedArtifact,ResearchStudy,ResearchSubject,Resource,SampledData,Signature,Specimen,Task,Timing,TriggerDefinition,UsageContext,base64Binary,boolean,canonical,code,date,dateTime,decimal,id,instant,integer,markdown,oid,positiveInt,string,time,unsignedInt,uri,url,uuid'
+                           model.entities.values())) == 'DocumentReference,FamilyRelationship,Observation,Organization,Patient,Practitioner,PractitionerRole,Questionnaire,QuestionnaireResponse,ResearchStudy,ResearchSubject,Specimen,Task'
     assert fhir_profile_retriever.primitives == [], "All profiles were not found."
 
 
@@ -47,14 +47,15 @@ def test_model_public(config_path, data_path, observation_expected_properties, o
     resource_properties = defaultdict(set)
     for context in process_files(model, f"{data_path}/public/*.ndjson"):
         assert context
-        for k in ['model', 'properties', 'resource', 'entity']:
+        for k in ['properties', 'resource', 'entity']:
             assert getattr(context, k), f"{k} was empty"
+
         properties = context.properties
         resource = context.resource
-        assert resource['id'] and resource['resourceType']
-        print(resource['id'], resource['resourceType'])
+
+        assert resource.id and resource.resource_type
         assert properties['id']
-        resource_properties[resource['resourceType']].update(properties.keys())
+        resource_properties[resource.resource_type].update(properties.keys())
     # check consistent properties for each resource type.
     assert set(resource_properties.keys()) == {'Observation', 'Organization', 'Practitioner', 'PractitionerRole',
                                                'ResearchStudy'}
@@ -73,18 +74,15 @@ def test_model_research_study_observation(config_path, data_path, observation_ex
     properties = None
     for context in process_files(model, f"{data_path}/public/ResearchStudyObservationSummary.ndjson"):
         assert context
-        for k in ['model', 'properties', 'resource', 'entity']:
+        for k in ['properties', 'resource', 'entity']:
             assert getattr(context, k), f"{k} was empty"
         properties = context.properties
         resource = context.resource
-        assert resource['id'] and resource['resourceType']
+        assert resource.id and resource.resource_type
         assert properties['id']
-        resource_properties[resource['resourceType']].update(properties.keys())
+        resource_properties[resource.resource_type].update(properties.keys())
 
     assert set(resource_properties['Observation']) == observation_expected_properties
-    for key_, property_ in properties.items():
-        assert 'type' in property_.leaf_elements[-1], f"leaf element missing type {key_}"
-        # print(property_.flattened_key, property_.value, ". ".join(description(property_)))
 
 
 def test_model_document_reference(config_path, data_path, document_reference_expected_properties):
@@ -94,18 +92,15 @@ def test_model_document_reference(config_path, data_path, document_reference_exp
     properties = None
     for context in process_files(model, f"{data_path}/protected/DocumentReference.ndjson"):
         assert context
-        for k in ['model', 'properties', 'resource', 'entity']:
+        for k in ['properties', 'resource', 'entity']:
             assert getattr(context, k), f"{k} was empty"
         properties = context.properties
         resource = context.resource
-        assert resource['id'] and resource['resourceType']
+        assert resource.id and resource.resource_type
         assert properties['id']
-        resource_properties[resource['resourceType']].update(properties.keys())
+        resource_properties[resource.resource_type].update(properties.keys())
 
     assert set(resource_properties['DocumentReference']) == document_reference_expected_properties
-    for key_, property_ in properties.items():
-        assert 'type' in property_.leaf_elements[-1], f"leaf element missing type {key_}"
-        # print(property_.flattened_key, property_.value, ". ".join(description(property_)))
 
 
 def description(property_) -> List[str]:
