@@ -434,7 +434,7 @@ def kf(ctx):
 
 @demo.command()
 @click.pass_context
-def genomic_reporting(ctx):
+def genomics_reporting(ctx):
     """Read oncology example from ImplementationGuide."""
     show = ctx.obj['show']
     dry_run = ctx.obj['dry_run']
