@@ -269,69 +269,94 @@ class TransformerContext(Context):
     def transform(self):
         """Creates properties."""
         if self.simplify:
-            js, _ = self.resource.as_simplified_json()
+            js, simplified_schema = self.resource.as_simplified_json()
+            flattened = flatten(js, separator='|')
+
+            for flattened_key, value in flattened.items():
+                dict_ = simplified_schema
+                for flattened_key_part in flattened_key.split('|'):
+                    if flattened_key_part not in dict_ and flattened_key_part.isnumeric():
+                        # traverse over list index
+                        continue
+                    if flattened_key_part in dict_:
+                        dict_ = dict_[flattened_key_part]
+                flattened_key = flattened_key.replace('|', '.')
+                self.properties[flattened_key] = Property(**dict_, value=value, flattened_key=flattened_key)
         else:
             js = self.resource.as_json(strict=False)
 
-        assert 'resourceType' in js, "Should have resourceType"
-        js['resource_type'] = js['resourceType']
+            assert 'resourceType' in js, "Should have resourceType"
+            js['resource_type'] = js['resourceType']
 
-        flattened = flatten(js, separator='.')
+            flattened = flatten(js, separator='.')
 
-        for flattened_key, value in flattened.items():
-            resource_ = self.resource
+            for flattened_key, value in flattened.items():
+                resource_ = self.resource
+                contained_list_ = None
+                found = False
+                for flattened_key_part in flattened_key.split('.'):
+                    if flattened_key_part.isnumeric():
+                        # traverse over list index
+                        index = int(flattened_key_part)
+                        if contained_list_ and len(contained_list_) > index and hasattr(contained_list_[index], 'attribute_docstrings'):
+                            resource_ = contained_list_[int(flattened_key_part)]
+                        continue
+                    for name, jsname, typ, is_list, of_many, not_optional in resource_.elementProperties() + [
+                            ("resource_type", "resource_type", str, False, None, False)]:
+                        if flattened_key_part == name:
+                            found = True
 
-            enum_ = None
+                            if isinstance(getattr(resource_, name), list):
+                                test_list_ = getattr(resource_, name)
+                                if len(test_list_) > 0 and hasattr(test_list_[0], 'attribute_docstrings'):
+                                    contained_list_ = getattr(resource_, name)
+                                    break
 
-            found = False
-            for flattened_key_part in flattened_key.split('.'):
-                if flattened_key_part.isnumeric():
-                    # traverse over list index
-                    continue
-                for name, jsname, typ, is_list, of_many, not_optional in resource_.elementProperties() + [
-                        ("resource_type", "resource_type", str, False, None, False)]:
-                    if flattened_key_part == name:
-                        found = True
-                        docstring = resource_.attribute_docstrings().get(name)
+                            docstring = resource_.attribute_docstrings().get(name)
 
-                        if resource_.attribute_enums().get(name):
-                            enum_ = resource_.attribute_enums().get(name)
+                            enum_ = None
+                            if resource_.attribute_enums().get(name):
+                                enum_ = resource_.attribute_enums().get(name)
 
-                        if hasattr(getattr(resource_, name), 'attribute_docstrings'):
-                            resource_ = getattr(resource_, name)
+                            # follow resource
+                            if hasattr(getattr(resource_, name), 'attribute_docstrings'):
+                                resource_ = getattr(resource_, name)
 
-                        if flattened_key == 'resource_type':
-                            flattened_key = 'resourceType'
-                        apply_enum = enum_ if name == 'code' else None
+                            if flattened_key == 'resource_type':
+                                flattened_key = 'resourceType'
 
-                        self.properties[flattened_key] = Property(
-                                flattened_key=flattened_key,
-                                value=value,
-                                docstring=docstring,
-                                enum=apply_enum,
-                                name=name,
-                                jsname=jsname,
-                                typ=value.__class__.__name__,
-                                is_list=is_list,
-                                of_many=of_many,
-                                not_optional=not_optional
-                            )
+                            # apply_enum = enum_
+                            # if resource_.__class__.__name__ == 'CodeableConcept' and name != 'code':
+                            #     apply_enum = None
 
-                        break
+                            self.properties[flattened_key] = Property(
+                                    flattened_key=flattened_key,
+                                    value=value,
+                                    docstring=docstring,
+                                    enum=enum_,
+                                    name=name,
+                                    jsname=jsname,
+                                    typ=value.__class__.__name__,
+                                    is_list=is_list,
+                                    of_many=of_many,
+                                    not_optional=not_optional
+                                )
 
-            if not found:
-                self.properties[flattened_key] = Property(
-                    flattened_key=flattened_key,
-                    value=value,
-                    docstring='extension',
-                    enum=None,
-                    name='extension',
-                    jsname='extension',
-                    typ=value.__class__.__name__,
-                    is_list=True,
-                    of_many=None,
-                    not_optional=False
-                )
+                            break
+
+                if not found:
+                    self.properties[flattened_key] = Property(
+                        flattened_key=flattened_key,
+                        value=value,
+                        docstring='extension',
+                        enum=None,
+                        name='extension',
+                        jsname='extension',
+                        typ=value.__class__.__name__,
+                        is_list=True,
+                        of_many=None,
+                        not_optional=False
+                    )
 
 
 class EdgeSummary(BaseModel):
