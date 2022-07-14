@@ -139,9 +139,11 @@ class DictionaryEmitter(Emitter):
             if property_.not_optional:
                 yield property_.flattened_key
 
-    def render_property(self, context) -> tuple[str, dict]:
+    @staticmethod
+    def render_property(context) -> tuple[str, dict]:
         """Render the property type and description."""
         for property_ in context.properties.values():
+
             required = property_.not_optional
             type_codes = [DictionaryEmitter.normalize_type(property_.typ, property_)]
             if not required:

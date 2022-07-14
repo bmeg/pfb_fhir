@@ -35,7 +35,7 @@ def test_model(config_path, input_ncpi_patient_paths):
     for expected_patient_key_set in expected_patient_key_sets:
         if actual_key_set == expected_patient_key_set:
             _ok = True
-    assert _ok, f"Unexpected key set: {actual_key_set}"
+    assert _ok, f"Unexpected key set: {sorted(actual_key_set)}"
 
 
 def test_emitter(config_path, input_ncpi_patient_paths, output_path, pfb_path):
@@ -73,8 +73,25 @@ def test_patient_emitter(config_path, patient_input_path, output_path, pfb_path)
     assert 'Patient.yaml' in schema
     patient_schema = schema['Patient.yaml']
     properties_with_term_def = [k for k, p in patient_schema['properties'].items() if 'term' in p]
-    print(properties_with_term_def)
-    assert set(properties_with_term_def) == set({})
+    assert set(properties_with_term_def) == {'address_0_type',
+                                             'address_0_use',
+                                             'contact_0_address_type',
+                                             'contact_0_address_use',
+                                             'contact_0_gender',
+                                             'contact_0_name_use',
+                                             'contact_0_telecom_0_system',
+                                             'contact_0_telecom_0_use',
+                                             'contact_1_address_type',
+                                             'contact_1_address_use',
+                                             'contact_1_gender',
+                                             'contact_1_name_use',
+                                             'contact_1_telecom_0_system',
+                                             'contact_1_telecom_0_use',
+                                             'gender',
+                                             'name_0_use',
+                                             'telecom_0_system',
+                                             'telecom_0_use',
+                                             'text_status'}
 
     from pprint import pprint
     properties_with_term_def_but_no_enum = []
