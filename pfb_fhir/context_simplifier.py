@@ -33,7 +33,7 @@ class ContextSimplifier(object):
         context.properties = {}
         for k, properties in simplified_properties.items():
             for p in properties:
-                context.properties[p.flattened_key] = p
+                context.properties[p.flattened_key.replace(':', '_').replace('-', '_')] = p
         return context
 
     @staticmethod
@@ -106,7 +106,7 @@ class ContextSimplifier(object):
 
         if simplified_extensions_key:
             del simplified_properties[simplified_extensions_key]
-            simplified_properties[simplified_extensions_key] = simplified_extensions
+            simplified_properties[simplified_extensions_key.replace(':', '_').replace('-', '_')] = simplified_extensions
 
         return ContextSimplifier._property_extensions(simplified_properties)
 
@@ -141,6 +141,7 @@ class ContextSimplifier(object):
                     None)
 
                 sub_extension_name = sub_extension_url_property.value.split('/')[-1]
+                sub_extension_name = sub_extension_name.replace(':', '_').replace('-', '_')
                 simplified_extension = deepcopy(sub_extension_value)
                 simplified_extension.flattened_key = f"{extension_name}.{sub_extension_name}"
                 simplified_extensions.append(simplified_extension)
@@ -148,7 +149,7 @@ class ContextSimplifier(object):
 
             extension_index += 1
         if len(simplified_extensions) > 0:
-            return simplified_extensions_key, simplified_extensions
+            return simplified_extensions_key.replace(':', '_').replace('-', '_'), simplified_extensions
         return None, None
 
     @staticmethod
