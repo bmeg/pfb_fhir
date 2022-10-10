@@ -22,6 +22,8 @@ from dictionaryutils import dump_schemas_from_dir
 import logging
 from pfb_fhir.common import first_occurrence
 from pfb_fhir.terminology.value_sets import ValueSets
+# from pfb_fhir.extensions.extensions import Extensions
+# extensions = Extensions()
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,11 @@ STATIC_ENTITIES = [
     "_settings",
     "_terms",
 ]
+
+
+def _normalize_property_name(name):
+    """Replace special characters."""
+    return name.replace('.', '_').replace(':', '_').replace('-', '_')
 
 
 class Emitter(BaseModel, abc.ABC):
@@ -67,6 +74,9 @@ class DictionaryEmitter(Emitter):
 
     template: dict
     _value_sets: object = PrivateAttr()
+    _all_properties: object = PrivateAttr()
+    _path: str = PrivateAttr()
+    _last_context: object = PrivateAttr()
 
     class Config:
         """Allow arbitrary user types for fields (since we have reference to dict)."""
@@ -80,6 +90,18 @@ class DictionaryEmitter(Emitter):
         super().__init__(**data)
         assert self.template
         self._value_sets = ValueSets()
+        self._all_properties = defaultdict(dict)
+        self._path = None
+        self._last_context = defaultdict(dict)
+
+    def close(self) -> None:
+        """Close any open files."""
+        for entity_id in self._all_properties:
+            path = f'{self.work_dir}/{entity_id}.yaml'
+            self.open_files[path] = open(path, "w")
+            yaml.dump(self.render_schema(self.template, self._last_context[entity_id]), self.open_files[path])
+            self.open_files[path].flush()
+        super().close()
 
     @staticmethod
     def _get_template():
@@ -89,15 +111,12 @@ class DictionaryEmitter(Emitter):
         return yaml.load(template_file, Loader=yaml.SafeLoader)
 
     def emit(self, context: TransformerContext) -> bool:
-        """Ensure file open, write row."""
-        path = f'{self.work_dir}/{context.entity.id}.yaml'
-        if path in self.open_files:
-            # already wrote schema
-            return True
-
-        self.open_files[path] = open(path, "w")
-        yaml.dump(self.render_schema(self.template, context), self.open_files[path])
-        self.open_files[path].flush()
+        """Collect property names."""
+        for property_name, property_ in context.properties.items():
+            if property_name not in self._all_properties[context.entity.id]:
+                self._all_properties[context.entity.id][property_name] = property_
+        self._last_context[context.entity.id] = context
+        return True
 
     def render_schema(self, template, context):
         """Render context into a gen3 schema."""
@@ -107,7 +126,7 @@ class DictionaryEmitter(Emitter):
         schema['category'] = context.entity.category
         schema['description'] = context.resource.__doc__
         schema['links'] = [link for link in self.render_links(context)]
-        schema['required'] = [required.replace('.', '_') for required in self.render_required(context)]
+        schema['required'] = [_normalize_property_name(required) for required in self.render_required(context)]
         for property_name, schema_property in self.render_property(context):
             schema['properties'][property_name] = schema_property
         return schema
@@ -116,18 +135,21 @@ class DictionaryEmitter(Emitter):
     def render_links(context) -> Iterator[dict]:
         """Gen3 link collection."""
         for link_key, link in context.entity.links.items():
-            _neighbor = link.targetProfile
-            target_type = _neighbor.split('/')[-1]
-            backref = inflection.pluralize(context.entity.id)
-            name = inflection.pluralize(target_type)
-            yield {
-                'name': name,
-                'backref': backref,
-                'label': name,
-                'target_type': target_type,
-                'multiplicity': 'many_to_many',
-                'required': link.required
-            }
+            _neighbors = link.targetProfile
+            if not isinstance(_neighbors, list):
+                _neighbors = [_neighbors]
+            for _neighbor in _neighbors:
+                target_type = _neighbor.split('/')[-1]
+                backref = inflection.pluralize(context.entity.id)
+                name = inflection.pluralize(target_type)
+                yield {
+                    'name': name,
+                    'backref': backref,
+                    'label': name,
+                    'target_type': target_type,
+                    'multiplicity': 'many_to_many',
+                    'required': link.required
+                }
 
     @staticmethod
     def render_required(context) -> Iterator[str]:
@@ -139,13 +161,13 @@ class DictionaryEmitter(Emitter):
             if property_.not_optional:
                 yield property_.flattened_key
 
-    @staticmethod
-    def render_property(context) -> tuple[str, dict]:
+    def render_property(self, context) -> tuple[str, dict]:
         """Render the property type and description."""
-        for property_ in context.properties.values():
+        for property_ in self._all_properties[context.entity.id].values():
 
             required = property_.not_optional
-            type_codes = [DictionaryEmitter.normalize_type(property_.typ, property_)]
+
+            type_codes = [DictionaryEmitter.normalize_type(property_.typ, property_, context.resource.resource_type)]
             if not required:
                 type_codes.append('null')
 
@@ -162,6 +184,7 @@ class DictionaryEmitter(Emitter):
                     'term': {'termDef': term_def, 'description': description}
                 }
                 # add enum
+
                 enum_codes = property_.enum.restricted_to
                 if enum_codes and property_.enum.binding_strength in ['required', 'preferred']:
                     del schema_property['type']
@@ -172,7 +195,8 @@ class DictionaryEmitter(Emitter):
                 else:
                     logger.debug(f"No enumeration found for: {property_.flattened_key} {property_.enum.url}")
 
-            yield property_.flattened_key.replace('.', '_'), schema_property
+            yield _normalize_property_name(property_.flattened_key), schema_property
+
 
     @staticmethod
     def get_term_def(property_) -> str:
@@ -192,7 +216,7 @@ class DictionaryEmitter(Emitter):
         return term_def
 
     @staticmethod
-    def normalize_type(code, property_) -> str:
+    def normalize_type(code, property_, resource_type) -> str:
         """Cast to json schema types."""
         if code in FHIR_TYPES:
             return FHIR_TYPES[code].json_type
@@ -203,8 +227,8 @@ class DictionaryEmitter(Emitter):
             return "number"
         if code in ['boolean', 'Boolean', 'bool']:
             return 'boolean'
-        if first_occurrence(f"No mapping for {code} default to string"):
-            logger.warning(f"No mapping for {code} default to string")
+        if first_occurrence(f"No mapping for {code} default to string {resource_type}.{property_.name}"):
+            logger.warning(f"No mapping for {code} default to string {resource_type}.{property_.name}")
         return 'string'
 
     @staticmethod
@@ -307,7 +331,7 @@ class PFBJsonEmitter(Emitter):
                     })
 
         # create simple flat json
-        flattened = {p.flattened_key.replace('.', '_'): p.value for p in context.properties.values()}
+        flattened = {_normalize_property_name(p.flattened_key): p.value for p in context.properties.values()}
         flattened['links'] = links
 
         #
@@ -325,6 +349,7 @@ class PFBJsonEmitter(Emitter):
         # gh4gh_drs_uri from context.entity
         if context.resource.resource_type == 'DocumentReference':
             flattened['gh4gh_drs_uri'] = None
+            flattened['file_md5sum'] = None
             if context.resource.content:
                 for content in context.resource.content:
                     if content.attachment:
@@ -517,7 +542,7 @@ def inspect_pfb(file_name) -> InspectionResults:
         assert 'relations' in obj_
         for r in obj_['relations']:
             if not graph_[r['dst_name']][r['dst_id']]:
-                yield f"{r['dst_name']}.{r['dst_id']} , referenced from {obj_['name']}.{obj_['id']} not found in Graph "
+                yield f"{r['dst_name']}.{r['dst_id']} referenced from {obj_['name']}.{obj_['id']} not found in Graph"
 
     graph = recursive_default_dict()
 
