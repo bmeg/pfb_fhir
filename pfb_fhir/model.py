@@ -118,7 +118,7 @@ class Element(BaseModel):
 class Link(Element):
     """Edge between entities."""
 
-    targetProfile: str
+    targetProfile: List[str]
     """Constrain edge target."""
     required: Optional[bool] = True
     """Warn if missing."""
@@ -192,6 +192,12 @@ class Property(BaseModel):
     """A value[x]?"""
     not_optional: bool
     """Required."""
+    is_extension: Optional[bool] = False
+    """is this property derived from an extension"""
+    extension_url: Optional[str] = None
+    """The base url of the extension."""
+    extension_child_url: Optional[str] = None
+    """The url of the child aka sub_extension."""
 
     value: Any
     """The value."""
@@ -210,6 +216,7 @@ class Model(BaseModel):
             config = yaml.safe_load(fp)
 
         needs_adding = []
+        # use name as id
         for entity_name, entity in config['entities'].items():
             if 'id' not in entity:
                 entity['id'] = entity_name
@@ -220,6 +227,12 @@ class Model(BaseModel):
                         link['id'] = link_name
             if entity['id'] not in config['entities']:
                 needs_adding.append(entity)
+        # make all targetProfile lists
+        for entity_name, entity in config['entities'].items():
+            if 'links' in entity:
+                for link_name, link in entity['links'].items():
+                    if isinstance(link['targetProfile'], str):
+                        link['targetProfile'] = [link['targetProfile']]
         # add entities that not are sub-typed
         for entity in needs_adding:
             config['entities'][entity['id']] = entity
@@ -244,6 +257,26 @@ class Context(BaseModel):
     obj: dict = {}
 
 
+class ExtensionValue(BaseModel):
+    url: str
+    value: object
+
+
+def extension_value(ext) -> List[ExtensionValue]:
+    """Returns value in extension for single, and multi values."""
+    # single
+    for property_, value_ in ext.__dict__.items():
+        if property_.startswith('value') and value_:
+            return [ExtensionValue(url=ext.url, value=value_)]
+    values = []
+    if ext.extension:
+        for sub_extension in ext.extension:
+            for property_, value_ in sub_extension.__dict__.items():
+                if property_.startswith('value') and value_:
+                    values.append(ExtensionValue(url=sub_extension.url, value=value_))
+    return values
+
+
 class TransformerContext(Context):
     """Typed context."""
     class Config:
@@ -261,28 +294,58 @@ class TransformerContext(Context):
     entity: Optional[Entity]
     """Model Entity associated with transformer."""
 
+    _value_sets: object = PrivateAttr()
+
+    # extensions: Optional[Extensions]
+    # """Extensions helper."""
+
     def __init__(self, **data):
         """Runs transform after init."""
+        # defer import
+        from pfb_fhir.terminology.value_sets import ValueSets
         super().__init__(**data)
+        self._value_sets = ValueSets()
         self.transform()
 
     def transform(self):
         """Creates properties."""
+
+        # deferred import, avoids circular references
+        from pfb_fhir.extensions.extensions import Extensions
+        extension_lookup = Extensions()
+
+        # # handle extensions separately
+        # # what about extensions in child classes and lists?
+        # resource_extensions = self.resource.extension
+        # self.resource.extension = None
+
         if self.simplify:
+            # simplified json
             js, simplified_schema = self.resource.as_simplified_json()
             flattened = flatten(js, separator='|')
 
             for flattened_key, value in flattened.items():
-                dict_ = simplified_schema
+                element_schema = simplified_schema
                 for flattened_key_part in flattened_key.split('|'):
-                    if flattened_key_part not in dict_ and flattened_key_part.isnumeric():
+                    if flattened_key_part not in element_schema and flattened_key_part.isnumeric():
                         # traverse over list index
                         continue
-                    if flattened_key_part in dict_:
-                        dict_ = dict_[flattened_key_part]
+                    # traverse down the element to get child schemas
+                    if flattened_key_part in element_schema:
+                        element_schema = element_schema[flattened_key_part]
                 flattened_key = flattened_key.replace('|', '.')
-                self.properties[flattened_key] = Property(**dict_, value=value, flattened_key=flattened_key)
+
+                extension_docstring = self.lookup_extension_docstring(element_schema, extension_lookup, flattened_key)
+                if extension_docstring:
+                    element_schema['docstring'] = extension_docstring
+
+                extension_enum = self.lookup_extension_enum(element_schema, extension_lookup, flattened_key)
+                if extension_enum:
+                    element_schema['enum'] = extension_enum
+
+                self.properties[flattened_key] = Property(**element_schema, value=value, flattened_key=flattened_key)
         else:
+            # as-is, flattened json
             js = self.resource.as_json(strict=False)
 
             assert 'resourceType' in js, "Should have resourceType"
@@ -301,8 +364,8 @@ class TransformerContext(Context):
                         if contained_list_ and len(contained_list_) > index and hasattr(contained_list_[index], 'attribute_docstrings'):
                             resource_ = contained_list_[int(flattened_key_part)]
                         continue
-                    for name, jsname, typ, is_list, of_many, not_optional in resource_.elementProperties() + [
-                            ("resource_type", "resource_type", str, False, None, False)]:
+                    for name, jsname, typ, is_list, of_many, not_optional in resource_.elementProperties() + [("resource_type", "resource_type", str, False, None, False)]:
+
                         if flattened_key_part == name:
                             found = True
 
@@ -324,10 +387,6 @@ class TransformerContext(Context):
 
                             if flattened_key == 'resource_type':
                                 flattened_key = 'resourceType'
-
-                            # apply_enum = enum_
-                            # if resource_.__class__.__name__ == 'CodeableConcept' and name != 'code':
-                            #     apply_enum = None
 
                             self.properties[flattened_key] = Property(
                                     flattened_key=flattened_key,
@@ -357,6 +416,151 @@ class TransformerContext(Context):
                         of_many=None,
                         not_optional=False
                     )
+
+        # # handle extensions the same way for both simplified and as-is
+        # if resource_extensions:
+        #     logger.debug(f"> extensions {[ext.url for ext in resource_extensions]}")
+        #     for resource_extension in resource_extensions:
+        #         resource_extension_values = extension_value(resource_extension)
+        #         if len(resource_extension_values) == 0:
+        #             logger.warning(("no value in extension", resource_extension.url))
+        #             continue
+        #         extension_definition = extension_lookup.resource(resource_extension.url)
+        #         if not extension_definition:
+        #             logger.warning(("could not find definition for extension", resource_extension.url))
+        #             for resource_extension_value in resource_extension_values:
+        #                 flattened_key = resource_extension.url.split('/')[-1].replace('-', '_')
+        #                 resource_extension_value_url = resource_extension_value.url.split('/')[-1].replace('-', '_')
+        #                 if flattened_key != resource_extension_value_url:
+        #                     flattened_key = f"{flattened_key}_{resource_extension_value_url}"
+        #                 self.properties[flattened_key] = Property(
+        #                     flattened_key=flattened_key,
+        #                     value=resource_extension_value.value,
+        #                     docstring=f"No documentation for extension. {resource_extension.url} {flattened_key}",
+        #                     enum=None,
+        #                     name=flattened_key,
+        #                     jsname=flattened_key,
+        #                     typ=resource_extension_value.value.__class__.__name__,
+        #                     is_list=False,
+        #                     of_many=False,
+        #                     not_optional=False
+        #                 )
+        #             continue
+        #         if extension_definition:
+        #             extension_elements = [ee for ee in extension_definition.elements()]
+        #             if len(extension_elements) > 0:
+        #                 # multi valued
+        #                 logger.debug((' > multi', resource_extension_values, resource_extension.url,
+        #                              [(ee.slice.sliceName, ee.type.type[0].code) for ee in extension_elements]))
+        #                 for extension_element in extension_elements:
+        #                     resource_extension_value = next(iter(rev for rev in resource_extension_values if
+        #                                                          rev.url == extension_element.slice.sliceName), None)
+        #                     if not resource_extension_value:
+        #                         logger.warning(("missing extension definition", resource_extension.url,
+        #                                        extension_element.slice.sliceName))
+        #                         continue
+        #                     flattened_key = resource_extension.url.split('/')[-1].replace('-', '_')
+        #                     resource_extension_value_url = extension_element.slice.sliceName.split('/')[-1].replace('-', '_')
+        #                     if flattened_key != resource_extension_value_url:
+        #                         flattened_key = f"{flattened_key}_{resource_extension_value_url}"
+        #                     self.properties[flattened_key] = Property(
+        #                         flattened_key=flattened_key,
+        #                         value=resource_extension_value.value,
+        #                         docstring=f"extension:{extension_definition.description}\nproperty:{extension_element.slice.definition}",
+        #                         enum=None,  # TODO
+        #                         name=flattened_key,
+        #                         jsname=flattened_key,
+        #                         typ=resource_extension_value.value.__class__.__name__,
+        #                         is_list=False,
+        #                         of_many=False,
+        #                         not_optional=False
+        #                     )
+        #             else:
+        #                 # single valued
+        #                 logger.debug((' > single', resource_extension_value, resource_extension.url,
+        #                              [(extension_definition.id, extension_definition.extension_type().type[0].code)]))
+        #                 resource_extension_value = resource_extension_values[0]
+        #                 flattened_key = resource_extension.url.split('/')[-1].replace('-', '_')
+        #                 resource_extension_value_url = resource_extension_value.url.split('/')[-1].replace('-', '_')
+        #                 if flattened_key != resource_extension_value_url:
+        #                     flattened_key = f"{flattened_key}_{resource_extension_value_url}"
+        #                 self.properties[flattened_key] = Property(
+        #                     flattened_key=flattened_key,
+        #                     value=resource_extension_value.value,
+        #                     docstring=f"extension:{extension_definition.description}",
+        #                     enum=None,
+        #                     name=flattened_key,
+        #                     jsname=flattened_key,
+        #                     typ=resource_extension_value.value.__class__.__name__,
+        #                     is_list=False,
+        #                     of_many=False,
+        #                     not_optional=False
+        #                 )
+        #
+
+    def lookup_extension_docstring(self, element_schema, extension_lookup, flattened_key):
+        if element_schema.get('is_extension', False) and element_schema['docstring'] is None:
+            # lookup documentation of extension
+            if not element_schema['extension_url']:
+                logger.warning(
+                    ("No extension_url", self.resource.resource_type, self.resource.id, flattened_key))
+            else:
+                extension_definition = extension_lookup.resource(element_schema['extension_url'])
+                if not extension_definition:
+                    logger.warning(
+                        ("No extension_definition", self.resource.resource_type, self.resource.id,
+                         flattened_key, element_schema['extension_url']))
+                else:
+                    extension_docstring = extension_definition.description
+                    if element_schema['extension_child_url']:
+                        extension_child = next(iter([ec for ec in extension_definition.snapshot.element if
+                                                     ec.sliceName == element_schema['extension_child_url']]), None)
+                        if not extension_child:
+                            logger.warning(
+                                ("No extension_child", self.resource.resource_type, self.resource.id,
+                                 flattened_key, element_schema['extension_url'],
+                                 element_schema['extension_child_url']))
+                        else:
+                            extension_docstring += f"\n{extension_child.definition}"
+                    return extension_docstring
+        return None
+
+    def lookup_extension_enum(self, element_schema, extension_lookup, flattened_key):
+        if element_schema.get('is_extension', False) and element_schema['enum'] is None and element_schema['typ'] == 'Coding':
+            # lookup documentation of extension
+            if not element_schema['extension_url']:
+                logger.warning(
+                    ("No extension_url", self.resource.resource_type, self.resource.id, flattened_key))
+            else:
+                extension_definition = extension_lookup.resource(element_schema['extension_url'])
+                if not extension_definition:
+                    logger.warning(
+                        ("No extension_definition", self.resource.resource_type, self.resource.id,
+                         flattened_key, element_schema['extension_url']))
+                else:
+                    flattened_key_part = flattened_key.split('_')[-1]
+                    value_definition = next(iter([e for e in extension_definition.snapshot.element if f"{flattened_key_part}.value[" in e.id]), None)
+                    binding = value_definition.binding
+                    if not binding:
+                        logger.warning(
+                            ("No value_definition.binding", self.resource.resource_type, self.resource.id,
+                             flattened_key, element_schema['extension_url'], flattened_key_part))
+                    else:
+                        value_set = self._value_sets.resource(binding.valueSet)
+                        restricted_to = []
+                        if value_set:
+                            if 'expansion' in value_set and 'contains' in value_set['expansion']:
+                                for concept in value_set['expansion']['contains']:
+                                    restricted_to.append(concept['code'])
+                            for concept in value_set['concept']:
+                                restricted_to.append(concept['code'])
+                        return {
+                            'url': binding.valueSet,
+                            'restricted_to': restricted_to,
+                            'binding_strength': binding.strength,
+                            'class_name': 'str'
+                        }
+        return None
 
 
 class EdgeSummary(BaseModel):
