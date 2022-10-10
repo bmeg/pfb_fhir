@@ -1,0 +1,7 @@
+
+
+base: [
+  'http://hl7.org/fhir/us/core/package.tgz', 'https://build.fhir.org/definitions.json.zip'
+]
+
+extensions: []
