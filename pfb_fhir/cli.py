@@ -16,12 +16,17 @@ from fhirclient.models.domainresource import DomainResource
 from importlib_metadata import distribution
 
 from pfb_fhir import NaturalOrderGroup, DEFAULT_OUTPUT_PATH, DEFAULT_CONFIG_PATH, initialize_model, run_cmd
+from pfb_fhir.common import first_occurrence
 from pfb_fhir.emitter import inspect_pfb
 from pfb_fhir.emitter import pfb
 from pfb_fhir.model import TransformerContext
+from pfb_fhir.extensions.extensions import Extensions
+from pfb_fhir.terminology.value_sets import ValueSets, load_bundle, load_dir
 
 LOG_FORMAT = '%(asctime)s %(name)s %(levelname)-8s %(message)s'
 logger = logging.getLogger(__name__)
+
+extensions = Extensions()
 
 
 @click.group(cls=NaturalOrderGroup)
@@ -44,6 +49,7 @@ def cli(ctx, log_level, output_path, config_path):
     if os.path.isfile(config_path):
         model = initialize_model(config_path)
         ctx.obj['model'] = model
+        ctx.obj['extensions'] = Extensions()
 
 
 @cli.command()
@@ -98,7 +104,8 @@ def inspect(ctx, pfb_path):
 
 @cli.command("visualize")
 @click.option('--pfb_path', help='Location to read PFB.')
-@click.option('--layout', show_default=True, default='planar_layout', help='Position nodes algorithm. see https://networkx.org/documentation/stable/reference/drawing.html')
+@click.option('--layout', show_default=True, default='planar_layout',
+              help='Position nodes algorithm. see https://networkx.org/documentation/stable/reference/drawing.html')
 @click.pass_context
 def visualize(ctx, pfb_path, layout):
     """Create a simple visualization."""
@@ -191,14 +198,31 @@ def process_files(model, input_paths, simplify=False, strict=True) -> Iterator[T
         else:
             files = glob.glob(input_path)
         assert len(files) > 0, f"Did not find any json files in {input_path}"
-        # process the data
+        # process the data, yield the context for all resources
         for file in files:
             logger.info(file)
             for resource in read_resources(file, strict=strict):
                 assert isinstance(resource,
                                   DomainResource), f"Error reading {file}. Should be DomainResource, was {resource.__class__}"
-                context = TransformerContext(resource=resource, simplify=simplify, entity=model.entities[resource.resource_type])
-                yield context
+                if resource.contained:
+                    for contained in resource.contained:
+                        if contained.resource_type in model.entities:
+                            yield TransformerContext(resource=contained, simplify=simplify,
+                                                     entity=model.entities[contained.resource_type],
+                                                     extensions=extensions)
+                        else:
+                            msg = f"No mapping for {contained.resource_type}"
+                            if first_occurrence(msg):
+                                logger.warning(msg)
+                    resource.contained = None
+                if resource.resource_type in model.entities:
+                    yield TransformerContext(resource=resource, simplify=simplify,
+                                             entity=model.entities[resource.resource_type],
+                                             extensions=extensions)
+                else:
+                    msg = f"No mapping for {resource.resource_type}"
+                    if first_occurrence(msg):
+                        logger.warning(msg)
 
 
 @cli.command()
@@ -211,6 +235,23 @@ def config(ctx, format_):
         print(ctx.obj['model'].yaml())
     else:
         print(ctx.obj['model'].json())
+
+
+@cli.command()
+@click.pass_context
+@click.option('--path', required=True,
+              help='Path to value set files')
+def add_value_sets(ctx, path):
+    """Add additional value set definitions."""
+    path = Path(path)
+    value_sets = ValueSets()
+    if not path.exists():
+        logger.error(f"{path} does not exist")
+        return
+    if path.is_dir():
+        load_dir(value_sets.database_file_name, json_path=path)
+    else:
+        load_bundle(value_sets.database_file_name, json_path=path)
 
 
 @cli.group()
