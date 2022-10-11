@@ -1,5 +1,5 @@
 """Load valuesets into sqlite"""
-
+import shutil
 import sqlite3
 import json
 import logging
@@ -19,6 +19,7 @@ logger = logging.getLogger("valuesets")
 
 DATABASE_FILE_NAME = "valuesets.sqlite"
 VALUESET_FILE_NAME = "valuesets.json"
+VALUESET_DIR_NAME = "package"
 
 _create_valuesets_table_sql = """
 -- projects table
@@ -60,7 +61,7 @@ def _resource_count(database_path):
     return data['resource_count']
 
 
-def _load(database_path, json_path):
+def load_bundle(database_path, json_path):
     """Load the json into a sqlite table"""
 
     conn = _create_connection(database_path)
@@ -85,7 +86,7 @@ def _load(database_path, json_path):
         url = resource['url']
         # logger.debug(f"{type_}, {id_}, {full_url}, {url}")
         c = conn.cursor()
-        c.execute("insert into valuesets values (?, ?, ?, ?, ?)", [full_url, type_, id_, url, json.dumps(resource)])
+        c.execute("insert or replace into valuesets values (?, ?, ?, ?, ?)", [full_url, type_, id_, url, json.dumps(resource)])
         resource_count += 1
         conn.commit()
 
@@ -154,20 +155,61 @@ def _create_table(conn, create_table_sql):
 
 def _download_base(cache_path, url):
     """Download and unzip base terminology."""
-    cmd = f'''
-    temp_file=$(mktemp)
-    wget -qO- {url} > $temp_file
-    unzip $temp_file valuesets.json -d {cache_path}
-    rm $temp_file
-    '''
+    extension = url.split('.')[-1]
+    cmds = {
+        'tgz': f'''
+                temp_file=$(mktemp)
+                wget -qO- {url} > $temp_file
+                tar -zxvf $temp_file -C  {cache_path}
+                rm $temp_file
+                ''',
+        'zip': f'''
+                temp_file=$(mktemp)
+                wget -qO- {url} > $temp_file
+                unzip -o $temp_file valuesets.json -d {cache_path}
+                rm $temp_file
+                '''
+    }
 
-    run_cmd(cmd)
+    run_cmd(cmds[extension])
+
+
+def load_dir(database_path, extension_dir_name):
+    """Load the json into a sqlite table"""
+
+    extension_path = Path(extension_dir_name)
+
+    conn = _create_connection(database_path)
+    _create_table(conn, _create_valuesets_table_sql)
+
+    resource_count = 0
+    for file in extension_path.glob("ValueSet*.json"):
+        with open(file, "r") as input_stream:
+            value_set = json.load(input_stream)
+            if value_set['resourceType'] == 'ValueSet':
+                # expect [CodeSystem, ValueSet] as types
+                type_ = value_set['resourceType']
+                id_ = value_set['id']
+                url = value_set['url']
+                # full_url = value_set['fullUrl']
+                # logger.debug(f"{type_}, {id_}, {full_url}, {url}")
+                c = conn.cursor()
+                c.execute("insert into valuesets values (?, ?, ?, ?, ?)",
+                          [url, type_, id_, url, json.dumps(value_set)])
+
+                resource_count += 1
+                conn.commit()
+
+    # no longer need json
+    # shutil.rmtree(extension_dir_name)
+    return resource_count
 
 
 class ValueSets(object):
     """Lookup FHIR ValueSet and Codeset from sqlite."""
 
-    def __init__(self, database_file_name=DATABASE_FILE_NAME, valueset_file_name=VALUESET_FILE_NAME) -> None:
+    def __init__(self, database_file_name=DATABASE_FILE_NAME, valueset_file_name=VALUESET_FILE_NAME,
+                 valueset_dir_name=VALUESET_DIR_NAME) -> None:
         """Load table."""
         cache_path = Path(os.environ.get("PFB_FHIR_CACHE_PATH", 'cache'))
         cache_path.mkdir(exist_ok=True)
@@ -176,22 +218,44 @@ class ValueSets(object):
 
         self.database_file_name = Path(cache_path, database_file_name)
         self.valueset_file_name = Path(cache_path, valueset_file_name)
+        self.valueset_dir_name = Path(cache_path, valueset_dir_name)
+
         self.resource_count = 0
+
+        # for base in config['base']:
+        #     _download_base(str(cache_path), base)
+        # logger.info(f"Loading from {self.valueset_dir_name} into {self.database_file_name}")
+        # self.resource_count = _load_dir(self.database_file_name, self.valueset_dir_name)
+        # logger.info(f"Loaded {self.resource_count} ")
+
         if not os.path.isfile(self.database_file_name):
 
             if os.path.isfile(self.database_file_name):
                 logger.debug(f"Deleting existing db file {self.database_file_name}")
                 os.unlink(self.database_file_name)
 
-            if not self.valueset_file_name.is_file():
-                _download_base(str(cache_path), config['base'])
+            # if not self.valueset_file_name.is_file():
+            #     _download_base(str(cache_path), config['base'])
 
-            assert self.valueset_file_name.is_file()
-            logger.debug(f"Loading from {self.valueset_file_name} into {self.database_file_name}")
-            self.resource_count = _load(self.database_file_name, self.valueset_file_name)
+            # assert self.valueset_file_name.is_file()
+            # logger.debug(f"Loading from {self.valueset_file_name} into {self.database_file_name}")
+            # self.resource_count = _load(self.database_file_name, self.valueset_file_name)
+            #
+            # for valueset in config['valuesets']:
+            #     _load_curated(self.database_file_name, valueset)
 
-            for valueset in config['valuesets']:
-                _load_curated(self.database_file_name, valueset)
+            if not self.valueset_dir_name.is_dir():
+                for base in config['base']:
+                    _download_base(str(cache_path), base)
+
+            logger.error(f"Loading from {self.valueset_dir_name} into {self.database_file_name}")
+            self.resource_count = load_dir(self.database_file_name, self.valueset_dir_name)
+            logger.error(f"Loaded {self.resource_count} ")
+
+            logger.error(f"Loading from {self.valueset_file_name} into {self.database_file_name}")
+            self.resource_count = load_bundle(self.database_file_name, self.valueset_file_name)
+            logger.error(f"Loaded {self.resource_count} ")
+
         else:
             self.resource_count = _resource_count(self.database_file_name)
 
@@ -210,9 +274,11 @@ class ValueSets(object):
             return None
         data['resource'] = json.loads(data['resource'])
 
-        includes = data['resource']['compose']['include']
-        if not isinstance(includes, list):
-            includes = [includes]
+        includes = []
+        if 'compose' in data['resource']:
+            includes = data['resource']['compose']['include']
+            if not isinstance(includes, list):
+                includes = [includes]
 
         accumulated_concepts = []
 

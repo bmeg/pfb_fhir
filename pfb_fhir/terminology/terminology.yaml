@@ -1,6 +1,10 @@
 
+# for example: https://build.fhir.org/ig/HL7/US-Core/full-ig.zip full-ig/site/expansions.json
+#              'http://hl7.org/fhir/us/core/package.tgz',
+base: [
+  'https://build.fhir.org/definitions.json.zip'
+]
 
-base: 'https://build.fhir.org/definitions.json.zip'
 
 valuesets:
   # specimen
