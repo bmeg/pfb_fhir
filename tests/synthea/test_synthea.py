@@ -1,6 +1,7 @@
 """Test synthetic data."""
 import json
 import os
+import re
 from collections import defaultdict
 
 from pfb_fhir import initialize_model  # , start_profiler, stop_profiler
@@ -32,6 +33,7 @@ def test_model(config_path):
 
     assert 'multipleBirthBoolean' in resource_properties['Patient']
     assert 'deceasedDateTime' in resource_properties['Patient']
+
     expected_suffixes = ['valueCoding', 'valueString', 'valueCode', 'valueDecimal']
     for suffix in expected_suffixes:
         found = False
@@ -66,5 +68,10 @@ def test_emitter(config_path, input_paths, output_path, pfb_path):
         assert properties['submitter_id']
         assert properties['id'] != properties['submitter_id']
         logger.info(f"check custom submitter id:{properties['id']} submitter_id:{properties['submitter_id']}")
+        illegal_keys = []
+        for key in properties:
+            if not re.match('^[_a-zA-Z][_a-zA-Z0-9]*$', key):
+                illegal_keys.append(key)
+        assert len(illegal_keys) == 0, illegal_keys
 
     cleanup_emitter(output_path, pfb_path)
