@@ -52,6 +52,8 @@ def config_path():
 @fixture
 def kids_first_cookie():
     """AWSELBAuthSessionCookie cookie captured from https://kf-api-fhir-service.kidsfirstdrc.org browser"""
+    if 'KIDS_FIRST_COOKIE' not in os.environ:
+        return None
     assert 'KIDS_FIRST_COOKIE' in os.environ
     assert os.environ['KIDS_FIRST_COOKIE'].startswith('AWSELBAuthSessionCookie')
     return os.environ['KIDS_FIRST_COOKIE']
